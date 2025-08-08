@@ -1,0 +1,519 @@
+openapi: 3.0.3
+info:
+  title: OpenWishlist API
+  version: 0.1.0
+  description: Transparent, self-hostable wishlist application API.
+  license:
+    name: AGPL-3.0-or-later
+servers:
+  - url: http://localhost:8080
+    description: Local dev server
+tags:
+  - name: Auth
+  - name: Wishlists
+  - name: Wishes
+  - name: Public
+  - name: Admin
+  - name: System
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: owl_session
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string, example: "about:blank" }
+        title: { type: string }
+        status: { type: integer, format: int32 }
+        detail: { type: string }
+        instance: { type: string }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+    User:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string, format: email }
+    Wishlist:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        userId: { type: integer, format: int64 }
+        title: { type: string, maxLength: 190 }
+        description: { type: string, nullable: true }
+        isPublic: { type: boolean }
+        shareSlug: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    Wish:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        wishlistId: { type: integer, format: int64 }
+        title: { type: string, maxLength: 190 }
+        url: { type: string, format: uri, nullable: true }
+        priceCents: { type: integer, nullable: true }
+        priority: { type: integer, minimum: 1, maximum: 5, nullable: true }
+        notes: { type: string, nullable: true }
+        imageMode: { type: string, enum: [link, local] }
+        imageUrl: { type: string, format: uri, nullable: true }
+        imagePath: { type: string, nullable: true }
+        imageMime: { type: string, nullable: true }
+        imageBytes: { type: integer, nullable: true }
+        imageWidth: { type: integer, nullable: true }
+        imageHeight: { type: integer, nullable: true }
+        imageHash: { type: string, nullable: true }
+        imageStatus: { type: string, enum: [pending, ok, failed] }
+        imageLastError: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    PaginatedWishlists:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Wishlist' }
+        total: { type: integer }
+    PaginatedWishes:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Wish' }
+        total: { type: integer }
+    SettingsGroupResponse:
+      type: object
+      additionalProperties:
+        type: object
+        additionalProperties: true
+    SettingsChange:
+      type: object
+      required: [ key, value ]
+      properties:
+        key: { type: string }
+        value: {}
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    Offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    Sort:
+      name: sort
+      in: query
+      schema: { type: string, example: "title,-createdAt" }
+    Q:
+      name: q
+      in: query
+      schema: { type: string, maxLength: 200 }
+    WishlistId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    WishId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    PublicSlug:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string }
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: "ok" }
+                  time: { type: string, format: date-time }
+
+  /api/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, passwordConfirm]
+              properties:
+                email: { type: string, format: email, maxLength: 190 }
+                password: { type: string, minLength: 10 }
+                passwordConfirm: { type: string, minLength: 10 }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '422':
+          description: Validation error
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /api/login:
+    post:
+      tags: [Auth]
+      summary: Login (session cookie)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+                remember: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Logged in
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+              description: HttpOnly session cookie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '401':
+          description: Invalid credentials
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /api/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      responses:
+        '204':
+          description: No content
+
+  /api/wishlists:
+    get:
+      tags: [Wishlists]
+      summary: List wishlists
+      security: [ { cookieAuth: [] } ]
+      parameters: [ { $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Offset' }, { $ref: '#/components/parameters/Sort' }, { $ref: '#/components/parameters/Q' } ]
+      responses:
+        '200':
+          description: OK
+          headers:
+            Link:
+              schema: { type: string }
+              description: Pagination links (next/prev)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedWishlists' }
+    post:
+      tags: [Wishlists]
+      summary: Create wishlist
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 190 }
+                description: { type: string }
+                isPublic: { type: boolean, default: false }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Wishlist' }
+        '422':
+          description: Validation error
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /api/wishlists/{id}:
+    get:
+      tags: [Wishlists]
+      summary: Get wishlist by id
+      security: [ { cookieAuth: [] } ]
+      parameters: [ { $ref: '#/components/parameters/WishlistId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Wishlist' }
+        '404':
+          description: Not found
+    put:
+      tags: [Wishlists]
+      summary: Update wishlist
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters: [ { $ref: '#/components/parameters/WishlistId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 190 }
+                description: { type: string }
+                isPublic: { type: boolean }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Wishlist' }
+        '422':
+          description: Validation error
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+    delete:
+      tags: [Wishlists]
+      summary: Delete wishlist
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters: [ { $ref: '#/components/parameters/WishlistId' } ]
+      responses:
+        '204':
+          description: Deleted
+
+  /api/wishlists/{id}/wishes:
+    get:
+      tags: [Wishes]
+      summary: List wishes of a wishlist
+      security: [ { cookieAuth: [] } ]
+      parameters:
+        - { $ref: '#/components/parameters/WishlistId' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Offset' }
+        - { $ref: '#/components/parameters/Sort' }
+        - { $ref: '#/components/parameters/Q' }
+      responses:
+        '200':
+          description: OK
+          headers:
+            Link:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaginatedWishes' }
+    post:
+      tags: [Wishes]
+      summary: Create a wish
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters: [ { $ref: '#/components/parameters/WishlistId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, imageMode]
+              properties:
+                title: { type: string, maxLength: 190 }
+                url: { type: string, format: uri, nullable: true }
+                priceCents: { type: integer, nullable: true }
+                priority: { type: integer, minimum: 1, maximum: 5, nullable: true }
+                notes: { type: string, nullable: true }
+                imageMode: { type: string, enum: [link, local] }
+                imageUrl: { type: string, format: uri }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Wish' }
+        '422':
+          description: Validation error
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /api/wishes/{id}:
+    get:
+      tags: [Wishes]
+      summary: Get wish by id
+      security: [ { cookieAuth: [] } ]
+      parameters: [ { $ref: '#/components/parameters/WishId' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Wish' }
+        '404':
+          description: Not found
+    put:
+      tags: [Wishes]
+      summary: Update wish
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters: [ { $ref: '#/components/parameters/WishId' } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 190 }
+                url: { type: string, format: uri, nullable: true }
+                priceCents: { type: integer, nullable: true }
+                priority: { type: integer, minimum: 1, maximum: 5, nullable: true }
+                notes: { type: string, nullable: true }
+                imageMode: { type: string, enum: [link, local] }
+                imageUrl: { type: string, format: uri, nullable: true }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Wish' }
+        '422':
+          description: Validation error
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+    delete:
+      tags: [Wishes]
+      summary: Delete wish
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters: [ { $ref: '#/components/parameters/WishId' } ]
+      responses:
+        '204':
+          description: Deleted
+
+  /api/wishes/{id}/image/refetch:
+    post:
+      tags: [Wishes]
+      summary: Re-fetch image for a wish
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      parameters: [ { $ref: '#/components/parameters/WishId' } ]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 200 }
+      responses:
+        '202':
+          description: Re-fetch enqueued
+
+  /api/public/lists/{slug}:
+    get:
+      tags: [Public]
+      summary: Get public list by slug
+      parameters: [ { $ref: '#/components/parameters/PublicSlug' } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wishlist: { $ref: '#/components/schemas/Wishlist' }
+                  wishes:
+                    type: array
+                    items: { $ref: '#/components/schemas/Wish' }
+        '404':
+          description: Not found
+
+  /api/admin/settings:
+    get:
+      tags: [Admin]
+      summary: Read settings (grouped)
+      security: [ { cookieAuth: [] } ]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SettingsGroupResponse' }
+    put:
+      tags: [Admin]
+      summary: Update settings (bulk or single)
+      security:
+        - cookieAuth: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [changes]
+                  properties:
+                    changes:
+                      type: array
+                      items: { $ref: '#/components/schemas/SettingsChange' }
+                - $ref: '#/components/schemas/SettingsChange'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  changed:
+                    type: array
+                    items: { $ref: '#/components/schemas/SettingsChange' }
+        '422':
+          description: Validation error
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
