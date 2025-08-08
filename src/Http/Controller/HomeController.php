@@ -14,9 +14,8 @@ final class HomeController
 
     public function index(): void
     {
-        if (!Session::userId()) {
-            Router::redirect('/login');
-        }
+	if (!Session::userId()) Router::redirect('/login');
+	Router::redirect('/wishlists');
 
         View::render('home', [
             'title' => 'My Lists',
