@@ -5,6 +5,7 @@ use OpenWishlist\Http\Router;
 use OpenWishlist\Http\Controller\AuthController;
 use OpenWishlist\Http\Controller\HomeController;
 use OpenWishlist\Http\Controller\WishlistController;
+use OpenWishlist\Http\Controller\WishController;
 use OpenWishlist\Support\Session;
 use OpenWishlist\Support\Db;
 
@@ -60,6 +61,13 @@ $router->post('/wishlists/{id}/toggle-public', [$wl, 'togglePublic']);
 
 // public by slug
 $router->get('/s/{slug}', [$wl, 'publicBySlug']);
+
+$wish = new WishController($pdo, $config);
+$router->get('/wishlists/{id}/wishes/new', [$wish, 'createForm']);
+$router->post('/wishlists/{id}/wishes', [$wish, 'create']);
+$router->get('/wishes/{id}/edit', [$wish, 'editForm']);
+$router->post('/wishes/{id}', [$wish, 'update']);
+$router->post('/wishes/{id}/delete', [$wish, 'delete']);
 
 // Dispatch
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
