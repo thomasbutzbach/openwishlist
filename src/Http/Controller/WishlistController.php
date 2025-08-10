@@ -42,10 +42,14 @@ final class WishlistController
         $wl = $this->getOwned((int)$params['id'], $uid);
         if (!$wl) { Router::status(404); echo 'Not found'; return; }
 
+        $stmt = $this->pdo->prepare('SELECT id, wishlist_id, title, url, price_cents, priority, image_mode, image_status FROM wishes WHERE wishlist_id=:wl ORDER BY created_at DESC');
+        $stmt->execute(['wl' => $wl['id']]);
+        $wishes = $stmt->fetchAll();
+
         View::render('wishlists/show', [
             'title' => $wl['title'],
             'wl' => $wl,
-            'baseUrl' => rtrim($this->config['app']['base_url'] ?? '', '/'),
+            'wishes' => $wishes,
         ]);
     }
 
