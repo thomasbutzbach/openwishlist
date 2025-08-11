@@ -30,8 +30,8 @@ final class WishController
 
     private function getOwnedWish(int $wishId, int $userId): ?array
     {
-        $sql = 'SELECT w.* FROM wishes w 
-                JOIN wishlists wl ON wl.id = w.wishlist_id 
+        $sql = 'SELECT w.* FROM wishes w
+                JOIN wishlists wl ON wl.id = w.wishlist_id
                 WHERE w.id = :id AND wl.user_id = :u';
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute(['id' => $wishId, 'u' => $userId]);
@@ -61,27 +61,31 @@ final class WishController
         $priority = isset($_POST['priority']) && $_POST['priority'] !== '' ? (int)$_POST['priority'] : null;
         $notes = trim($_POST['notes'] ?? '');
 
-        $imageMode = $_POST['image_mode'] ?? 'link';
+        $imageMode = $_POST['image_mode'] ?? 'none';
         $imageUrl = trim($_POST['image_url'] ?? '');
 
-        if ($title === '' || mb_strlen($title) > 190) {
-            Session::flash('error', 'Title is required and must be ≤ 190 characters.');
-            Router::redirect('/wishlists/'.$wl['id'].'/wishes/new');
-        }
-        if (!in_array($imageMode, ['link','local'], true)) {
+        if (!in_array($imageMode, ['none','link','local'], true)) {
             Session::flash('error', 'Invalid image mode.');
             Router::redirect('/wishlists/'.$wl['id'].'/wishes/new');
         }
-        if ($imageUrl === '' || !preg_match('#^https?://#i', $imageUrl)) {
-            Session::flash('error', 'Please provide a valid image URL (http/https).');
-            Router::redirect('/wishlists/'.$wl['id'].'/wishes/new');
+
+        if ($imageMode !== 'none') {
+            if ($imageUrl === '' || !preg_match('#^https?://#i', $imageUrl)) {
+                Session::flash('error', 'Please provide a valid image URL (http/https).');
+                Router::redirect('/wishlists/'.$wl['id'].'/wishes/new');
+            }
         }
+
         if ($priority !== null && ($priority < 1 || $priority > 5)) {
             Session::flash('error', 'Priority must be between 1 and 5.');
             Router::redirect('/wishlists/'.$wl['id'].'/wishes/new');
         }
 
-        $imageStatus = $imageMode === 'local' ? 'pending' : 'ok';
+        $imageStatus = match ($imageMode) {
+            'local' => 'pending',
+            'link'  => 'ok',
+            'none'  => null,
+        };
 
         $stmt = $this->pdo->prepare(
             'INSERT INTO wishes (wishlist_id,title,url,price_cents,priority,notes,image_mode,image_url,image_status)
@@ -95,7 +99,7 @@ final class WishController
             'pr' => $priority,
             'n'  => $notes !== '' ? $notes : null,
             'im' => $imageMode,
-            'iu' => $imageUrl,
+            'iu' => $imageMode === 'none' ? null : $imageUrl,
             'is' => $imageStatus,
         ]);
 
@@ -132,13 +136,15 @@ final class WishController
             Session::flash('error', 'Title is required and must be ≤ 190 characters.');
             Router::redirect('/wishes/'.$wish['id'].'/edit');
         }
-        if (!in_array($imageMode, ['link','local'], true)) {
+        if (!in_array($imageMode, ['none','link','local'], true)) {
             Session::flash('error', 'Invalid image mode.');
             Router::redirect('/wishes/'.$wish['id'].'/edit');
         }
-        if ($imageUrl === '' || !preg_match('#^https?://#i', $imageUrl)) {
-            Session::flash('error', 'Please provide a valid image URL (http/https).');
-            Router::redirect('/wishes/'.$wish['id'].'/edit');
+        if ($imageMode !== 'none') {
+            if ($imageUrl === '' || !preg_match('#^https?://#i', $imageUrl)) {
+                Session::flash('error', 'Please provide a valid image URL (http/https).');
+                Router::redirect('/wishes/'.$wish['id'].'/edit');
+            }
         }
         if ($priority !== null && ($priority < 1 || $priority > 5)) {
             Session::flash('error', 'Priority must be between 1 and 5.');
@@ -159,8 +165,13 @@ final class WishController
                 $imageStatus = 'ok';
             }
         }
+        if ($imageMode === 'none') {
+            $imagePath = null;
+            $imageStatus = null;
+            $imageUrl = null;
+        }
 
-        $sql = 'UPDATE wishes SET 
+        $sql = 'UPDATE wishes SET
                     title=:t, url=:u, price_cents=:p, priority=:pr, notes=:n,
                     image_mode=:im, image_url=:iu, image_status=:is, image_path=:ip
                 WHERE id=:id';

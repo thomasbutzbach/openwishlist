@@ -26,9 +26,11 @@
   </div>
   <fieldset class="row">
     <legend>Image</legend>
-    <label><input type="radio" name="image_mode" value="link" checked> Link (remote)</label>
+    <label><input type="radio" name="image_mode" value="none" checked> None</label>
+    <label><input type="radio" name="image_mode" value="link"> Link (remote)</label>
     <label><input type="radio" name="image_mode" value="local"> Local (download & store)</label>
     <label>Image URL<br><input type="url" name="image_url" placeholder="https://…"></label>
+    <p><small>Provide URL only for Link/Local modes.</small></p>
   </fieldset>
   <div class="row">
     <button type="submit">Add wish</button>
