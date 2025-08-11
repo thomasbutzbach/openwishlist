@@ -33,8 +33,10 @@
   </div>
   <fieldset class="row">
     <legend>Image</legend>
+    <label><input type="radio" name="image_mode" value="none" <?= $wish['image_mode']==='none'?'checked':'' ?>> None</label>
     <label><input type="radio" name="image_mode" value="link" <?= $wish['image_mode']==='link'?'checked':'' ?>> Link</label>
     <label><input type="radio" name="image_mode" value="local" <?= $wish['image_mode']==='local'?'checked':'' ?>> Local</label>
+    <p><small>Leave image URL empty when mode is None.</small></p>
     <label>Image URL<br>
       <input type="url" name="image_url" value="<?= htmlspecialchars($wish['image_url'] ?? '') ?>">
     </label>

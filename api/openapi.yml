@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: OpenWishlist API
-  version: 0.1.0
+  version: 0.1.1
   description: Transparent, self-hostable wishlist application API.
   license:
     name: AGPL-3.0-or-later
@@ -65,7 +65,7 @@ components:
         priceCents: { type: integer, nullable: true }
         priority: { type: integer, minimum: 1, maximum: 5, nullable: true }
         notes: { type: string, nullable: true }
-        imageMode: { type: string, enum: [link, local] }
+        imageMode: { type: string, enum: [none, link, local] }
         imageUrl: { type: string, format: uri, nullable: true }
         imagePath: { type: string, nullable: true }
         imageMime: { type: string, nullable: true }
@@ -73,7 +73,7 @@ components:
         imageWidth: { type: integer, nullable: true }
         imageHeight: { type: integer, nullable: true }
         imageHash: { type: string, nullable: true }
-        imageStatus: { type: string, enum: [pending, ok, failed] }
+        imageStatus: { type: string, enum: [pending, ok, failed], nullable: true }
         imageLastError: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time, nullable: true }
@@ -360,7 +360,7 @@ paths:
                 priceCents: { type: integer, nullable: true }
                 priority: { type: integer, minimum: 1, maximum: 5, nullable: true }
                 notes: { type: string, nullable: true }
-                imageMode: { type: string, enum: [link, local] }
+                imageMode: { type: string, enum: [none, link, local] }
                 imageUrl: { type: string, format: uri }
       responses:
         '201':
@@ -407,8 +407,8 @@ paths:
                 priceCents: { type: integer, nullable: true }
                 priority: { type: integer, minimum: 1, maximum: 5, nullable: true }
                 notes: { type: string, nullable: true }
-                imageMode: { type: string, enum: [link, local] }
-                imageUrl: { type: string, format: uri, nullable: true }
+                imageMode: { type: string, enum: [none, link, local] }
+                imageUrl: { type: string, format: uri, nullable: true, description: Required unless imageMode = 'none'. }
       responses:
         '200':
           description: Updated

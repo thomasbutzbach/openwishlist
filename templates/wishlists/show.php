@@ -28,10 +28,12 @@
       <?php foreach ($wishes as $w): ?>
         <tr>
           <td style="padding:.4rem">
-            <?php if (!empty($w['url'])): ?>
-              <a href="<?= htmlspecialchars($w['url']) ?>" target="_blank" rel="noopener"><?= htmlspecialchars($w['title']) ?></a>
+            <?php if ($w['image_mode'] === 'none'): ?>
+              None
+            <?php elseif ($w['image_mode'] === 'link'): ?>
+              Link
             <?php else: ?>
-              <?= htmlspecialchars($w['title']) ?>
+              Local (<?= htmlspecialchars($w['image_status'] ?? 'pending') ?>)
             <?php endif; ?>
           </td>
           <td style="padding:.4rem">
