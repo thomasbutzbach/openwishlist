@@ -14,48 +14,70 @@
 <?php if (empty($wishes)): ?>
   <p><em>No wishes yet.</em></p>
 <?php else: ?>
-  <table style="width:100%; border-collapse:collapse">
-    <thead>
-      <tr>
-        <th style="text-align:left; padding:.4rem; border-bottom:1px solid #ddd">Title</th>
-        <th style="text-align:left; padding:.4rem; border-bottom:1px solid #ddd">Price</th>
-        <th style="text-align:left; padding:.4rem; border-bottom:1px solid #ddd">Priority</th>
-        <th style="text-align:left; padding:.4rem; border-bottom:1px solid #ddd">Image</th>
-        <th style="text-align:left; padding:.4rem; border-bottom:1px solid #ddd">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($wishes as $w): ?>
-        <tr>
-          <td style="padding:.4rem">
-            <?php if ($w['image_mode'] === 'none'): ?>
-              None
-            <?php elseif ($w['image_mode'] === 'link'): ?>
-              Link
-            <?php else: ?>
-              Local (<?= htmlspecialchars($w['image_status'] ?? 'pending') ?>)
-            <?php endif; ?>
-          </td>
-          <td style="padding:.4rem">
-            <?php
-              echo isset($w['price_cents'])
-                   ? '€ ' . number_format(((int)$w['price_cents'])/100, 2, ',', '.')
-                   : '—';
-            ?>
-          </td>
-          <td style="padding:.4rem"><?= $w['priority'] ?? '—' ?></td>
-          <td style="padding:.4rem">
-            <?php if ($w['image_mode'] === 'link'): ?>
-              Link
-            <?php else: ?>
-              Local (<?= htmlspecialchars($w['image_status']) ?>)
-            <?php endif; ?>
-          </td>
-          <td style="padding:.4rem">
-            <a href="/wishes/<?= (int)$w['id'] ?>/edit">Edit</a>
-          </td>
-        </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
+  <?php foreach ($wishes as $w): ?>
+    <article>
+      <div class="grid">
+        <!-- Image -->
+        <div>
+          <?php if ($w['image_mode'] === 'none'): ?>
+            <figure style="background-color: var(--muted-color); text-align: center; padding: 3rem; margin: 0;">
+              <small>No Image</small>
+            </figure>
+          <?php elseif ($w['image_mode'] === 'link' && !empty($w['image_url'])): ?>
+            <img src="<?= htmlspecialchars($w['image_url']) ?>" 
+                 alt="<?= htmlspecialchars($w['title']) ?>" 
+                 style="width: 100%; height: 200px; object-fit: contain; background-color: var(--muted-color);">
+          <?php elseif ($w['image_mode'] === 'local' && $w['image_status'] === 'ok' && !empty($w['image_path'])): ?>
+            <img src="/<?= htmlspecialchars($w['image_path']) ?>" 
+                 alt="<?= htmlspecialchars($w['title']) ?>" 
+                 style="width: 100%; height: 200px; object-fit: contain; background-color: var(--muted-color);">
+          <?php elseif ($w['image_mode'] === 'local'): ?>
+            <figure style="background-color: var(--muted-color); text-align: center; padding: 3rem; margin: 0;">
+              <small><?= $w['image_status'] === 'pending' ? 'Processing...' : 'Failed to load' ?></small>
+            </figure>
+          <?php endif; ?>
+        </div>
+
+        <!-- Content -->
+        <div>
+          <header>
+            <h4>
+              <?php if (!empty($w['url'])): ?>
+                <a href="<?= htmlspecialchars($w['url']) ?>" target="_blank">
+                  <?= htmlspecialchars($w['title']) ?> ↗
+                </a>
+              <?php else: ?>
+                <?= htmlspecialchars($w['title']) ?>
+              <?php endif; ?>
+            </h4>
+          </header>
+          
+          <?php if (!empty($w['notes'])): ?>
+            <p><?= nl2br(htmlspecialchars($w['notes'])) ?></p>
+          <?php endif; ?>
+          
+          <details>
+            <summary>Details</summary>
+            <ul>
+              <?php if (isset($w['price_cents'])): ?>
+                <li><strong>Price:</strong> €<?= number_format(((int)$w['price_cents'])/100, 2, ',', '.') ?></li>
+              <?php endif; ?>
+              <?php if ($w['priority']): ?>
+                <li><strong>Priority:</strong> <?= (int)$w['priority'] ?>/5</li>
+              <?php endif; ?>
+              <li><strong>Image Mode:</strong> <?= htmlspecialchars($w['image_mode']) ?></li>
+            </ul>
+          </details>
+          
+          <footer>
+            <a href="/wishes/<?= (int)$w['id'] ?>/edit" role="button" class="secondary">Edit</a>
+            <form style="display: inline-block;" action="/wishes/<?= (int)$w['id'] ?>/delete" method="post" onsubmit="return confirm('Delete this wish?');">
+              <?= \OpenWishlist\Support\Csrf::field() ?>
+              <input type="submit" value="Delete" class="outline">
+            </form>
+          </footer>
+        </div>
+      </div>
+    </article>
+  <?php endforeach; ?>
 <?php endif; ?>

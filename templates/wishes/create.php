@@ -29,8 +29,10 @@
     <label><input type="radio" name="image_mode" value="none" checked> None</label>
     <label><input type="radio" name="image_mode" value="link"> Link (remote)</label>
     <label><input type="radio" name="image_mode" value="local"> Local (download & store)</label>
-    <label>Image URL<br><input type="url" name="image_url" placeholder="https://…"></label>
-    <p><small>Provide URL only for Link/Local modes.</small></p>
+    
+    <div id="image-url-field">
+      <label>Image URL<br><input type="url" name="image_url" placeholder="https://…"></label>
+    </div>
   </fieldset>
   <div class="row">
     <button type="submit">Add wish</button>
