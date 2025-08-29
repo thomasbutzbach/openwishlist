@@ -223,4 +223,119 @@ final class WishlistController
         } while ($q->fetchColumn());
         return $slug;
     }
+
+    public function exportCsv(array $params): void
+    {
+        $uid = $this->requireAuth();
+        $wl = $this->getOwned((int)$params['id'], $uid);
+        if (!$wl) { Router::status(404); echo 'Not found'; return; }
+
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wl ORDER BY COALESCE(priority, 999) ASC, created_at DESC');
+        $stmt->execute(['wl' => $wl['id']]);
+        $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $filename = 'wishlist-' . $wl['id'] . '-' . date('Y-m-d') . '.csv';
+        
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-cache, must-revalidate');
+        
+        $output = fopen('php://output', 'w');
+        
+        // UTF-8 BOM for Excel compatibility
+        fwrite($output, "\xEF\xBB\xBF");
+        
+        // CSV Header
+        fputcsv($output, [
+            'Title',
+            'URL', 
+            'Price (EUR)',
+            'Priority',
+            'Notes',
+            'Image Mode',
+            'Image Status',
+            'Created At'
+        ]);
+        
+        // CSV Data
+        foreach ($wishes as $wish) {
+            $price = isset($wish['price_cents']) ? number_format($wish['price_cents'] / 100, 2) : '';
+            
+            fputcsv($output, [
+                $wish['title'],
+                $wish['url'] ?? '',
+                $price,
+                $wish['priority'] ?? '',
+                $wish['notes'] ?? '',
+                $wish['image_mode'],
+                $wish['image_status'] ?? '',
+                $wish['created_at']
+            ]);
+        }
+        
+        fclose($output);
+    }
+
+    public function exportJson(array $params): void
+    {
+        $uid = $this->requireAuth();
+        $wl = $this->getOwned((int)$params['id'], $uid);
+        if (!$wl) { Router::status(404); echo 'Not found'; return; }
+
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wl ORDER BY COALESCE(priority, 999) ASC, created_at DESC');
+        $stmt->execute(['wl' => $wl['id']]);
+        $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Convert price_cents to euros for easier consumption
+        foreach ($wishes as &$wish) {
+            if (isset($wish['price_cents'])) {
+                $wish['price_euros'] = $wish['price_cents'] / 100;
+            }
+        }
+        unset($wish);
+
+        $exportData = [
+            'wishlist' => [
+                'id' => $wl['id'],
+                'title' => $wl['title'],
+                'description' => $wl['description'],
+                'is_public' => (bool)$wl['is_public'],
+                'share_slug' => $wl['share_slug'],
+                'created_at' => $wl['created_at'],
+                'updated_at' => $wl['updated_at']
+            ],
+            'wishes' => $wishes,
+            'export_metadata' => [
+                'exported_at' => date('c'),
+                'total_wishes' => count($wishes),
+                'format_version' => '1.0'
+            ]
+        ];
+
+        $filename = 'wishlist-' . $wl['id'] . '-' . date('Y-m-d') . '.json';
+        
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Cache-Control: no-cache, must-revalidate');
+        
+        echo json_encode($exportData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    }
+
+    public function exportPdf(array $params): void
+    {
+        $uid = $this->requireAuth();
+        $wl = $this->getOwned((int)$params['id'], $uid);
+        if (!$wl) { Router::status(404); echo 'Not found'; return; }
+
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wl ORDER BY COALESCE(priority, 999) ASC, created_at DESC');
+        $stmt->execute(['wl' => $wl['id']]);
+        $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        View::render('wishlists/export_pdf', [
+            'title' => $wl['title'] . ' - PDF Export',
+            'wl' => $wl,
+            'wishes' => $wishes,
+            'baseUrl' => rtrim($this->config['app']['base_url'] ?? '', '/')
+        ]);
+    }
 }

@@ -9,7 +9,10 @@
 </p>
 
 <p><a href="/wishlists/<?= (int)$wl['id'] ?>/edit">Edit list</a> ·
-   <a href="/wishlists/<?= (int)$wl['id'] ?>/wishes/new">Add wish</a></p>
+   <a href="/wishlists/<?= (int)$wl['id'] ?>/wishes/new">Add wish</a> ·
+   <a href="/wishlists/<?= (int)$wl['id'] ?>/export/csv">Export CSV</a> ·
+   <a href="/wishlists/<?= (int)$wl['id'] ?>/export/json">Export JSON</a> ·
+   <a href="/wishlists/<?= (int)$wl['id'] ?>/export/pdf" target="_blank">Export PDF</a></p>
 
 <?php if (empty($wishes)): ?>
   <p><em>No wishes yet.</em></p>
