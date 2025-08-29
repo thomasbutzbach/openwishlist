@@ -1,0 +1,124 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+use OpenWishlist\Support\Db;
+use OpenWishlist\Support\Jobs;
+use OpenWishlist\Support\Settings;
+use OpenWishlist\Domain\ImageProcessor;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+// Parse CLI arguments
+$opts = [
+    'maxJobs' => 10,
+    'maxSeconds' => 30,
+    'type' => 'image.fetch',
+    'verbose' => false,
+    'help' => false
+];
+
+$args = array_slice($argv, 1);
+for ($i = 0; $i < count($args); $i++) {
+    $arg = $args[$i];
+    if ($arg === '--help' || $arg === '-h') {
+        $opts['help'] = true;
+    } elseif ($arg === '--verbose' || $arg === '-v') {
+        $opts['verbose'] = true;
+    } elseif (str_starts_with($arg, '--max-jobs=')) {
+        $opts['maxJobs'] = (int)substr($arg, 11);
+    } elseif (str_starts_with($arg, '--max-seconds=')) {
+        $opts['maxSeconds'] = (int)substr($arg, 14);
+    } elseif (str_starts_with($arg, '--type=')) {
+        $opts['type'] = substr($arg, 7);
+    } elseif ($arg === '--max-jobs' && isset($args[$i + 1])) {
+        $opts['maxJobs'] = (int)$args[++$i];
+    } elseif ($arg === '--max-seconds' && isset($args[$i + 1])) {
+        $opts['maxSeconds'] = (int)$args[++$i];
+    } elseif ($arg === '--type' && isset($args[$i + 1])) {
+        $opts['type'] = $args[++$i];
+    } else {
+        echo "Unknown argument: $arg\n";
+        $opts['help'] = true;
+    }
+}
+
+if ($opts['help']) {
+    echo "OpenWishlist Job Worker\n\n";
+    echo "Usage: php bin/worker [options]\n\n";
+    echo "Options:\n";
+    echo "  --max-jobs N      Maximum jobs to process (default: 10)\n";
+    echo "  --max-seconds N   Maximum runtime in seconds (default: 30)\n";
+    echo "  --type TYPE       Job type to process (default: image.fetch)\n";
+    echo "  --verbose, -v     Verbose output\n";
+    echo "  --help, -h        Show this help\n\n";
+    echo "Example:\n";
+    echo "  php bin/worker --max-seconds=50 --max-jobs=20 --verbose\n\n";
+    exit(0);
+}
+
+v("worker starting (maxJobs={$opts['maxJobs']}, maxSeconds={$opts['maxSeconds']}, type={$opts['type']})");
+
+try {
+    $config = require __DIR__ . '/../config/local.php';
+    $pdo = Db::connect($config['db']);
+    
+    $jobs = new Jobs($pdo);
+    $settings = Settings::load($pdo);
+    $processor = new ImageProcessor($pdo, $settings);
+    
+    $started = time();
+    $done = 0;
+    
+    // Auto-seed jobs
+    $seeded = $jobs->seedImageFetchBatch(50);
+    if ($seeded > 0) {
+        v("seeded $seeded new job(s)");
+    }
+    
+    // Process jobs
+    while ($done < $opts['maxJobs'] && (time() - $started) < $opts['maxSeconds']) {
+        $job = $jobs->claimNext($opts['type']);
+        if (!$job) {
+            v("no more jobs found");
+            break;
+        }
+        
+        v("processing job {$job['id']} ({$job['type']})");
+        
+        try {
+            if ($job['type'] === 'image.fetch') {
+                $wishId = (int)($job['payload']['wishId'] ?? 0);
+                if ($wishId <= 0) throw new RuntimeException('missing wishId');
+                v("processing wish $wishId");
+                $processor->processWish($wishId);
+            } else {
+                throw new RuntimeException('unknown job type: ' . $job['type']);
+            }
+            
+            $jobs->complete($job['id']);
+            $done++;
+            v("job {$job['id']} completed successfully");
+        } catch (Throwable $e) {
+            $error = substr($e->getMessage(), 0, 500);
+            $jobs->fail($job['id'], $error, 120);
+            v("job {$job['id']} failed: $error");
+        }
+    }
+    
+    v("worker finished: processed $done job(s) in " . (time() - $started) . " seconds");
+    exit(0);
+    
+} catch (Throwable $e) {
+    v("FATAL ERROR: " . $e->getMessage());
+    v("Stack trace:\n" . $e->getTraceAsString());
+    exit(1);
+}
+
+function v(string $message): void
+{
+    global $opts;
+    if ($opts['verbose']) {
+        echo "[worker] " . date('H:i:s') . " $message\n";
+    }
+}

@@ -14,3 +14,6 @@ composer.lock
 # Cache / test artifacts
 coverage/
 .phpunit.cache/
+
+# Uploads
+public/uploads
