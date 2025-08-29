@@ -42,7 +42,7 @@ final class WishlistController
         $wl = $this->getOwned((int)$params['id'], $uid);
         if (!$wl) { Router::status(404); echo 'Not found'; return; }
 
-        $stmt = $this->pdo->prepare('SELECT id, wishlist_id, title, url, price_cents, priority, image_mode, image_status FROM wishes WHERE wishlist_id=:wl ORDER BY created_at DESC');
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wl ORDER BY COALESCE(priority, 999) ASC, created_at DESC');
         $stmt->execute(['wl' => $wl['id']]);
         $wishes = $stmt->fetchAll();
 
@@ -186,9 +186,15 @@ final class WishlistController
         $wl = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$wl) { Router::status(404); echo 'Not found'; return; }
 
+        // Load wishes for this public wishlist
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wid ORDER BY priority ASC, id ASC');
+        $stmt->execute(['wid' => $wl['id']]);
+        $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
         View::render('public_list', [
             'title' => $wl['title'],
             'wl' => $wl,
+            'wishes' => $wishes,
         ]);
     }
 
