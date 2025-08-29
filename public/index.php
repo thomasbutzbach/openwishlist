@@ -59,6 +59,9 @@ $router->get('/wishlists/{id}/edit', [$wl, 'editForm']);
 $router->post('/wishlists/{id}', [$wl, 'update']);
 $router->post('/wishlists/{id}/delete', [$wl, 'delete']);
 $router->post('/wishlists/{id}/toggle-public', [$wl, 'togglePublic']);
+$router->get('/wishlists/{id}/export/csv', [$wl, 'exportCsv']);
+$router->get('/wishlists/{id}/export/json', [$wl, 'exportJson']);
+$router->get('/wishlists/{id}/export/pdf', [$wl, 'exportPdf']);
 
 // public by slug
 $router->get('/s/{slug}', [$wl, 'publicBySlug']);
