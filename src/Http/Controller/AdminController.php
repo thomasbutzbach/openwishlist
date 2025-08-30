@@ -26,6 +26,78 @@ final class AdminController
         return $uid;
     }
 
+    public function dashboard(): void
+    {
+        $this->requireAdmin();
+        
+        // System statistics
+        $userStats = $this->pdo->query('
+            SELECT 
+                COUNT(*) as total_users,
+                SUM(role = "admin") as admin_users,
+                SUM(role = "user") as regular_users
+            FROM users
+        ')->fetch(\PDO::FETCH_ASSOC);
+        
+        $wishlistStats = $this->pdo->query('
+            SELECT 
+                COUNT(*) as total_wishlists,
+                SUM(is_public = 1) as public_wishlists,
+                SUM(is_public = 0) as private_wishlists
+            FROM wishlists
+        ')->fetch(\PDO::FETCH_ASSOC);
+        
+        $wishStats = $this->pdo->query('
+            SELECT 
+                COUNT(*) as total_wishes,
+                SUM(image_status = "ok") as wishes_with_images,
+                SUM(price_cents > 0) as wishes_with_price
+            FROM wishes
+        ')->fetch(\PDO::FETCH_ASSOC);
+        
+        // Job statistics
+        $jobs = new \OpenWishlist\Support\Jobs($this->pdo);
+        $jobStats = $jobs->getStats();
+        
+        // Recent activity (last 10 wishlists)
+        $recentWishlists = $this->pdo->query('
+            SELECT w.title, w.created_at, u.email
+            FROM wishlists w
+            JOIN users u ON w.user_id = u.id
+            ORDER BY w.created_at DESC
+            LIMIT 10
+        ')->fetchAll(\PDO::FETCH_ASSOC);
+        
+        View::render('admin/dashboard', [
+            'title' => 'Admin Dashboard',
+            'userStats' => $userStats,
+            'wishlistStats' => $wishlistStats,
+            'wishStats' => $wishStats,
+            'jobStats' => $jobStats,
+            'recentWishlists' => $recentWishlists
+        ]);
+    }
+
+    public function settingsPage(): void
+    {
+        $this->requireAdmin();
+        
+        try {
+            $settings = \OpenWishlist\Support\Settings::load($this->pdo);
+            
+            View::render('admin/settings', [
+                'title' => 'Settings',
+                'settings' => $settings
+            ]);
+        } catch (\Throwable $e) {
+            View::render('admin/settings', [
+                'title' => 'Settings',
+                'error' => 'Failed to load settings: ' . $e->getMessage(),
+                'settings' => []
+            ]);
+        }
+    }
+
     public function jobsPage(): void
     {
         $this->requireAdmin();
@@ -146,11 +218,69 @@ final class AdminController
                 $settings['allowed_domains'] = array_filter($input['allowed_domains'], 'is_string');
             }
             
-            \OpenWishlist\Support\Settings::save($this->pdo, $settings);
+            // Save each setting individually
+            \OpenWishlist\Support\Settings::set($this->pdo, 'app_name', $settings['app_name'], 'string');
+            \OpenWishlist\Support\Settings::set($this->pdo, 'max_file_size', $settings['max_file_size'], 'int');
+            \OpenWishlist\Support\Settings::set($this->pdo, 'public_registration', $settings['public_registration'], 'bool');
+            \OpenWishlist\Support\Settings::set($this->pdo, 'allowed_domains', $settings['allowed_domains'], 'json');
             
             Router::json(['message' => 'Settings updated successfully.']);
         } catch (\Throwable $e) {
             Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Failed to update settings.'], 500);
+        }
+    }
+
+    public function apiDeleteJob(array $params = []): void
+    {
+        $this->requireAdmin();
+        
+        try {
+            $id = (int)($params['id'] ?? 0);
+            if ($id <= 0) {
+                Router::json(['type' => 'about:blank', 'title' => 'Bad Request', 'status' => 400, 'detail' => 'Invalid job ID.'], 400);
+                return;
+            }
+            
+            $stmt = $this->pdo->prepare('DELETE FROM jobs WHERE id = :id');
+            $success = $stmt->execute(['id' => $id]);
+            
+            if ($stmt->rowCount() > 0) {
+                Router::json(['message' => 'Job deleted successfully.']);
+            } else {
+                Router::json(['type' => 'about:blank', 'title' => 'Not Found', 'status' => 404, 'detail' => 'Job not found.'], 404);
+            }
+        } catch (\Throwable $e) {
+            Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Failed to delete job.'], 500);
+        }
+    }
+
+    public function apiCleanupJobs(): void
+    {
+        $this->requireAdmin();
+        
+        try {
+            // Delete completed jobs older than 7 days
+            $stmt = $this->pdo->prepare("
+                DELETE FROM jobs 
+                WHERE status = 'completed' 
+                AND created_at < NOW() - INTERVAL 7 DAY
+            ");
+            $stmt->execute();
+            $completedDeleted = $stmt->rowCount();
+            
+            // Delete failed jobs older than 30 days  
+            $stmt = $this->pdo->prepare("
+                DELETE FROM jobs 
+                WHERE status = 'failed' 
+                AND created_at < NOW() - INTERVAL 30 DAY
+            ");
+            $stmt->execute();
+            $failedDeleted = $stmt->rowCount();
+            
+            $total = $completedDeleted + $failedDeleted;
+            Router::json(['message' => "Cleaned up $total old jobs ($completedDeleted completed, $failedDeleted failed)."]);
+        } catch (\Throwable $e) {
+            Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Failed to cleanup jobs.'], 500);
         }
     }
 

@@ -58,12 +58,38 @@ final class AuthController
         if (Session::userId()) {
             Router::redirect('/');
         }
+        
+        // Check if public registration is enabled
+        try {
+            $settings = \OpenWishlist\Support\Settings::load($this->pdo);
+            if (!($settings['public_registration'] ?? true)) {
+                Session::flash('error', 'Public registration is disabled. Contact an administrator to create an account.');
+                Router::redirect('/login');
+                return;
+            }
+        } catch (\Throwable $e) {
+            // If settings can't be loaded, allow registration by default
+        }
+        
         View::render('register', ['title' => 'Register']);
     }
 
     public function register(): void
     {
         Csrf::assert();
+        
+        // Check if public registration is enabled
+        try {
+            $settings = \OpenWishlist\Support\Settings::load($this->pdo);
+            if (!($settings['public_registration'] ?? true)) {
+                Session::flash('error', 'Public registration is disabled.');
+                Router::redirect('/login');
+                return;
+            }
+        } catch (\Throwable $e) {
+            // If settings can't be loaded, allow registration by default
+        }
+        
         $email = trim($_POST['email'] ?? '');
         $password = (string)($_POST['password'] ?? '');
         $confirm = (string)($_POST['passwordConfirm'] ?? '');
