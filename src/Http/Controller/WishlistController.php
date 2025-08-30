@@ -331,11 +331,20 @@ final class WishlistController
         $stmt->execute(['wl' => $wl['id']]);
         $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        View::render('wishlists/export_pdf', [
+        // Render PDF template directly without layout
+        extract([
             'title' => $wl['title'] . ' - PDF Export',
             'wl' => $wl,
             'wishes' => $wishes,
             'baseUrl' => rtrim($this->config['app']['base_url'] ?? '', '/')
-        ]);
+        ], EXTR_SKIP);
+        
+        $tpl = __DIR__ . '/../../../templates/wishlists/export_pdf.php';
+        if (!file_exists($tpl)) {
+            http_response_code(500);
+            echo "Template not found";
+            return;
+        }
+        require $tpl;
     }
 }

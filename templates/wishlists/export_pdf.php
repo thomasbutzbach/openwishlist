@@ -7,46 +7,82 @@
     @media print {
       body { margin: 0; }
       .no-print { display: none; }
+      
+      /* Force borders and backgrounds to print */
+      * {
+        -webkit-print-color-adjust: exact !important;
+        color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      
+      .wish-item {
+        border: 1px solid #333 !important;
+        box-shadow: none !important;
+        background: white !important;
+      }
+      
+      .wish-header {
+        background: #f5f5f5 !important;
+        border-bottom: 1px solid #333 !important;
+      }
+      
+      .wishlist-header {
+        background: #f8f8f8 !important;
+        border: 1px solid #ddd !important;
+      }
+      
+      .notes {
+        background: #f8f8f8 !important;
+        border: 1px solid #ddd !important;
+      }
     }
     
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      line-height: 1.6;
+      line-height: 1.4;
       color: #333;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
+      max-width: 100%;
+      margin: 0;
+      padding: 10px;
+      font-size: 12px;
     }
     
     h1 {
       color: #2c3e50;
-      border-bottom: 2px solid #3498db;
-      padding-bottom: 10px;
+      border-bottom: 1px solid #3498db;
+      padding-bottom: 5px;
+      font-size: 18px;
+      margin: 0 0 15px 0;
     }
     
     .wishlist-header {
       background: #f8f9fa;
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 30px;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      font-size: 11px;
+    }
+    
+    .wishlist-header p {
+      margin: 3px 0;
     }
     
     .wish-item {
       border: 1px solid #ddd;
-      border-radius: 8px;
-      margin-bottom: 20px;
+      border-radius: 4px;
+      margin-bottom: 8px;
       overflow: hidden;
       break-inside: avoid;
     }
     
     .wish-header {
       background: #f1f3f4;
-      padding: 15px;
+      padding: 6px 8px;
       border-bottom: 1px solid #ddd;
     }
     
     .wish-title {
-      font-size: 18px;
+      font-size: 13px;
       font-weight: bold;
       margin: 0;
       color: #2c3e50;
@@ -54,28 +90,31 @@
     
     .wish-url {
       color: #3498db;
-      font-size: 14px;
-      margin-top: 5px;
+      font-size: 10px;
+      margin-top: 2px;
+      word-break: break-all;
     }
     
     .wish-content {
-      padding: 15px;
+      padding: 6px 8px;
     }
     
     .wish-details {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 15px;
-      margin-bottom: 15px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 6px;
     }
     
     .detail-item {
-      font-size: 14px;
+      font-size: 10px;
+      flex: 0 0 auto;
     }
     
     .detail-label {
       font-weight: bold;
       color: #555;
+      display: inline;
     }
     
     .priority-high { color: #e74c3c; }
@@ -84,17 +123,18 @@
     
     .notes {
       background: #f8f9fa;
-      padding: 10px;
-      border-radius: 4px;
+      padding: 6px;
+      border-radius: 2px;
       font-style: italic;
-      margin-top: 10px;
+      margin-top: 6px;
+      font-size: 10px;
     }
     
     .export-info {
-      margin-top: 40px;
-      padding-top: 20px;
+      margin-top: 15px;
+      padding-top: 8px;
       border-top: 1px solid #ddd;
-      font-size: 12px;
+      font-size: 9px;
       color: #666;
       text-align: center;
     }
@@ -106,10 +146,11 @@
       background: #3498db;
       color: white;
       border: none;
-      padding: 10px 20px;
-      border-radius: 5px;
+      padding: 8px 15px;
+      border-radius: 4px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 12px;
+      z-index: 1000;
     }
     
     .print-button:hover {
@@ -153,29 +194,27 @@
           <div class="wish-details">
             <?php if (isset($wish['price_cents'])): ?>
               <div class="detail-item">
-                <div class="detail-label">Price:</div>
-                <div>€<?= number_format($wish['price_cents'] / 100, 2, ',', '.') ?></div>
+                <span class="detail-label">Price:</span> €<?= number_format($wish['price_cents'] / 100, 2, ',', '.') ?>
               </div>
             <?php endif; ?>
             
             <?php if ($wish['priority']): ?>
               <div class="detail-item">
-                <div class="detail-label">Priority:</div>
-                <div class="<?= $wish['priority'] <= 2 ? 'priority-high' : ($wish['priority'] <= 3 ? 'priority-medium' : 'priority-low') ?>">
-                  <?= (int)$wish['priority'] ?>/5
-                  <?php if ($wish['priority'] <= 2): ?>⭐<?php endif; ?>
-                </div>
+                <span class="detail-label">Priority:</span> 
+                <span class="<?= $wish['priority'] <= 2 ? 'priority-high' : ($wish['priority'] <= 3 ? 'priority-medium' : 'priority-low') ?>">
+                  <?= (int)$wish['priority'] ?>/5<?php if ($wish['priority'] <= 2): ?>⭐<?php endif; ?>
+                </span>
+              </div>
+            <?php endif; ?>
+            
+            <?php if ($wish['image_mode'] !== 'none'): ?>
+              <div class="detail-item">
+                <span class="detail-label">Image:</span> <?= htmlspecialchars($wish['image_mode']) ?>
               </div>
             <?php endif; ?>
             
             <div class="detail-item">
-              <div class="detail-label">Image:</div>
-              <div><?= htmlspecialchars($wish['image_mode']) ?></div>
-            </div>
-            
-            <div class="detail-item">
-              <div class="detail-label">Added:</div>
-              <div><?= date('M j, Y', strtotime($wish['created_at'])) ?></div>
+              <span class="detail-label">Added:</span> <?= date('M j, Y', strtotime($wish['created_at'])) ?>
             </div>
           </div>
           
