@@ -1,0 +1,68 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+/**
+ * OpenWishlist Version Management Script
+ * 
+ * Updates version in VERSION file and composer.json
+ * 
+ * Usage: php bin/set-version 1.0.0
+ */
+
+function main(array $argv): void
+{
+    if (count($argv) !== 2) {
+        echo "Usage: php bin/set-version <version>\n";
+        echo "Example: php bin/set-version 1.0.0\n";
+        exit(1);
+    }
+    
+    $version = trim($argv[1]);
+    
+    // Validate semantic versioning format
+    if (!preg_match('/^\d+\.\d+\.\d+(-[a-zA-Z0-9\-\.]+)?$/', $version)) {
+        echo "❌ Invalid version format. Use semantic versioning (e.g., 1.0.0 or 1.0.0-beta.1)\n";
+        exit(1);
+    }
+    
+    $versionFile = __DIR__ . '/../VERSION';
+    $composerFile = __DIR__ . '/../composer.json';
+    
+    try {
+        // Update VERSION file
+        file_put_contents($versionFile, $version . "\n");
+        echo "✅ Updated VERSION file to $version\n";
+        
+        // Update composer.json
+        if (file_exists($composerFile)) {
+            $composerContent = file_get_contents($composerFile);
+            $composer = json_decode($composerContent, true);
+            
+            if ($composer === null) {
+                throw new Exception('Invalid JSON in composer.json');
+            }
+            
+            $composer['version'] = $version;
+            
+            $newContent = json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
+            file_put_contents($composerFile, $newContent);
+            echo "✅ Updated composer.json to $version\n";
+        }
+        
+        echo "\n🎉 Version successfully updated to $version\n";
+        echo "💡 Consider creating a git tag: git tag v$version\n";
+        
+    } catch (Exception $e) {
+        echo "❌ ERROR: " . $e->getMessage() . "\n";
+        exit(1);
+    }
+}
+
+// Handle CLI execution
+if (php_sapi_name() === 'cli') {
+    main($argv);
+} else {
+    echo "This script must be run from the command line.\n";
+    exit(1);
+}
