@@ -104,4 +104,85 @@ final class AuthController
         Session::logout();
         Router::redirect('/login');
     }
+
+    // === API Methods ===
+
+    public function apiRegister(): void
+    {
+        try {
+            $input = Router::inputJson();
+            $email = trim($input['email'] ?? '');
+            $password = (string)($input['password'] ?? '');
+            $confirm = (string)($input['passwordConfirm'] ?? '');
+
+            // Validation
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                Router::json(['type' => 'about:blank', 'title' => 'Validation Error', 'status' => 400, 'detail' => 'Please provide a valid email.'], 400);
+                return;
+            }
+            if (strlen($password) < 10) {
+                Router::json(['type' => 'about:blank', 'title' => 'Validation Error', 'status' => 400, 'detail' => 'Password must be at least 10 characters.'], 400);
+                return;
+            }
+            if ($password !== $confirm) {
+                Router::json(['type' => 'about:blank', 'title' => 'Validation Error', 'status' => 400, 'detail' => 'Passwords do not match.'], 400);
+                return;
+            }
+
+            // Check existing user
+            $stmt = $this->pdo->prepare('SELECT id FROM users WHERE email = :email');
+            $stmt->execute(['email' => $email]);
+            if ($stmt->fetch()) {
+                Router::json(['type' => 'about:blank', 'title' => 'Conflict', 'status' => 409, 'detail' => 'User already exists.'], 409);
+                return;
+            }
+
+            // Create user
+            $hash = password_hash($password, PASSWORD_ARGON2ID);
+            $stmt = $this->pdo->prepare('INSERT INTO users (email, password_hash, role) VALUES (:e, :h, "user")');
+            $stmt->execute(['e' => $email, 'h' => $hash]);
+            $userId = (int)$this->pdo->lastInsertId();
+
+            // Login user
+            Session::login($userId);
+
+            Router::json(['id' => $userId, 'email' => $email], 201);
+        } catch (\Throwable $e) {
+            Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Registration failed.'], 500);
+        }
+    }
+
+    public function apiLogin(): void
+    {
+        try {
+            $input = Router::inputJson();
+            $email = trim($input['email'] ?? '');
+            $password = (string)($input['password'] ?? '');
+
+            if ($email === '' || $password === '') {
+                Router::json(['type' => 'about:blank', 'title' => 'Validation Error', 'status' => 400, 'detail' => 'Email and password are required.'], 400);
+                return;
+            }
+
+            $stmt = $this->pdo->prepare('SELECT id, email, password_hash FROM users WHERE email = :email');
+            $stmt->execute(['email' => $email]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user || !password_verify($password, $user['password_hash'])) {
+                Router::json(['type' => 'about:blank', 'title' => 'Unauthorized', 'status' => 401, 'detail' => 'Invalid credentials.'], 401);
+                return;
+            }
+
+            Session::login((int)$user['id']);
+            Router::json(['id' => (int)$user['id'], 'email' => $user['email']]);
+        } catch (\Throwable $e) {
+            Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Login failed.'], 500);
+        }
+    }
+
+    public function apiLogout(): void
+    {
+        Session::logout();
+        Router::json(['message' => 'Logged out successfully.']);
+    }
 }

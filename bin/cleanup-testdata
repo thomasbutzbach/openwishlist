@@ -1,0 +1,148 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+/**
+ * OpenWishlist Test Data Cleanup Script
+ * 
+ * This script removes test data from the database that may have been left
+ * behind by test runs. It identifies test data by common patterns.
+ * 
+ * Usage: php bin/cleanup-testdata [--dry-run]
+ */
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use OpenWishlist\Support\Db;
+
+function main(array $argv): void
+{
+    $dryRun = in_array('--dry-run', $argv);
+    
+    echo "🧹 OpenWishlist Test Data Cleanup\n";
+    echo str_repeat('=', 40) . "\n\n";
+    
+    if ($dryRun) {
+        echo "DRY RUN MODE - No data will be deleted\n\n";
+    }
+    
+    try {
+        // Load config and connect to database
+        $configFile = __DIR__ . '/../config/local.php';
+        if (!file_exists($configFile)) {
+            throw new Exception('Config file not found: ' . $configFile);
+        }
+        
+        $config = require $configFile;
+        $pdo = Db::connect($config['db']);
+        
+        // Find test users (emails starting with "test" or containing "test_")
+        echo "Scanning for test users...\n";
+        $userQuery = "SELECT id, email FROM users WHERE email LIKE 'test%' OR email LIKE '%test_%'";
+        $users = $pdo->query($userQuery)->fetchAll(PDO::FETCH_ASSOC);
+        
+        echo "Found " . count($users) . " test users\n";
+        
+        if (!empty($users)) {
+            $userIds = array_column($users, 'id');
+            $userIdsList = implode(',', $userIds);
+            
+            // Find wishes belonging to test users
+            echo "Scanning for test wishes...\n";
+            $wishQuery = "SELECT COUNT(*) FROM wishes w 
+                         JOIN wishlists wl ON wl.id = w.wishlist_id 
+                         WHERE wl.user_id IN ($userIdsList)";
+            $wishCount = $pdo->query($wishQuery)->fetchColumn();
+            echo "Found $wishCount test wishes\n";
+            
+            // Find wishlists belonging to test users
+            echo "Scanning for test wishlists...\n";
+            $wishlistQuery = "SELECT COUNT(*) FROM wishlists WHERE user_id IN ($userIdsList)";
+            $wishlistCount = $pdo->query($wishlistQuery)->fetchColumn();
+            echo "Found $wishlistCount test wishlists\n";
+            
+            // Find jobs related to test wishes
+            echo "Scanning for test jobs...\n";
+            $jobQuery = "SELECT COUNT(*) FROM jobs j
+                        WHERE j.type = 'image.fetch' 
+                        AND JSON_EXTRACT(j.payload, '$.wishId') IN (
+                            SELECT w.id FROM wishes w 
+                            JOIN wishlists wl ON wl.id = w.wishlist_id 
+                            WHERE wl.user_id IN ($userIdsList)
+                        )";
+            $jobCount = $pdo->query($jobQuery)->fetchColumn();
+            echo "Found $jobCount test jobs\n";
+            
+            echo "\nTotal test data to cleanup:\n";
+            echo "- Users: " . count($users) . "\n";
+            echo "- Wishlists: $wishlistCount\n";
+            echo "- Wishes: $wishCount\n";
+            echo "- Jobs: $jobCount\n\n";
+            
+            if (!$dryRun) {
+                echo "Cleaning up test data...\n";
+                
+                $pdo->beginTransaction();
+                
+                try {
+                    // Delete jobs first
+                    if ($jobCount > 0) {
+                        $deleteJobs = "DELETE FROM jobs WHERE type = 'image.fetch' 
+                                      AND JSON_EXTRACT(payload, '$.wishId') IN (
+                                          SELECT w.id FROM wishes w 
+                                          JOIN wishlists wl ON wl.id = w.wishlist_id 
+                                          WHERE wl.user_id IN ($userIdsList)
+                                      )";
+                        $deleted = $pdo->exec($deleteJobs);
+                        echo "✅ Deleted $deleted test jobs\n";
+                    }
+                    
+                    // Delete wishes
+                    if ($wishCount > 0) {
+                        $deleteWishes = "DELETE w FROM wishes w 
+                                        JOIN wishlists wl ON wl.id = w.wishlist_id 
+                                        WHERE wl.user_id IN ($userIdsList)";
+                        $deleted = $pdo->exec($deleteWishes);
+                        echo "✅ Deleted $deleted test wishes\n";
+                    }
+                    
+                    // Delete wishlists
+                    if ($wishlistCount > 0) {
+                        $deleteWishlists = "DELETE FROM wishlists WHERE user_id IN ($userIdsList)";
+                        $deleted = $pdo->exec($deleteWishlists);
+                        echo "✅ Deleted $deleted test wishlists\n";
+                    }
+                    
+                    // Delete users
+                    $deleteUsers = "DELETE FROM users WHERE id IN ($userIdsList)";
+                    $deleted = $pdo->exec($deleteUsers);
+                    echo "✅ Deleted $deleted test users\n";
+                    
+                    $pdo->commit();
+                    echo "\n🎉 Cleanup completed successfully!\n";
+                    
+                } catch (Exception $e) {
+                    $pdo->rollBack();
+                    throw $e;
+                }
+            } else {
+                echo "DRY RUN - No data was actually deleted.\n";
+                echo "Run without --dry-run to perform actual cleanup.\n";
+            }
+        } else {
+            echo "No test data found to cleanup.\n";
+        }
+        
+    } catch (Exception $e) {
+        echo "❌ ERROR: " . $e->getMessage() . "\n";
+        exit(1);
+    }
+}
+
+// Handle CLI execution
+if (php_sapi_name() === 'cli') {
+    main($argv);
+} else {
+    echo "This script must be run from the command line.\n";
+    exit(1);
+}

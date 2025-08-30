@@ -77,5 +77,33 @@ $admin = new AdminController($pdo, $config);
 $router->get('/admin/jobs', [$admin, 'jobsPage']);
 $router->post('/admin/jobs/run', [$admin, 'runJobs']);
 
+// === API Routes ===
+
+// API Auth
+$router->post('/api/register', [$auth, 'apiRegister']);
+$router->post('/api/login', [$auth, 'apiLogin']);
+$router->post('/api/logout', [$auth, 'apiLogout']);
+
+// API Wishlists
+$router->get('/api/wishlists', [$wl, 'apiIndex']);
+$router->post('/api/wishlists', [$wl, 'apiCreate']);
+$router->get('/api/wishlists/{id}', [$wl, 'apiShow']);
+$router->put('/api/wishlists/{id}', [$wl, 'apiUpdate']);
+$router->delete('/api/wishlists/{id}', [$wl, 'apiDelete']);
+
+// API Wishes
+$router->post('/api/wishlists/{id}/wishes', [$wish, 'apiCreate']);
+$router->get('/api/wishes/{id}', [$wish, 'apiShow']);
+$router->put('/api/wishes/{id}', [$wish, 'apiUpdate']);
+$router->delete('/api/wishes/{id}', [$wish, 'apiDelete']);
+$router->post('/api/wishes/{id}/image/refetch', [$wish, 'apiRefetchImage']);
+
+// API Public
+$router->get('/api/public/lists/{slug}', [$wl, 'apiPublicBySlug']);
+
+// API Admin
+$router->get('/api/admin/settings', [$admin, 'apiGetSettings']);
+$router->put('/api/admin/settings', [$admin, 'apiUpdateSettings']);
+
 // Dispatch
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);

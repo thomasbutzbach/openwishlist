@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace OpenWishlist\Http\Controller;
 
 use PDO;
+use OpenWishlist\Http\Router;
 use OpenWishlist\Support\Session;
 use OpenWishlist\Support\Csrf;
 use OpenWishlist\Support\View;
@@ -95,6 +96,62 @@ final class AdminController
         }
         \OpenWishlist\Support\Session::flash('success', $message);
         header('Location: /admin/jobs'); exit;
+    }
+
+    // === API Methods ===
+
+    public function apiGetSettings(): void
+    {
+        $this->requireAdmin();
+        
+        try {
+            $settings = \OpenWishlist\Support\Settings::load($this->pdo);
+            
+            // Only return safe/public settings, not internal ones
+            $publicSettings = [
+                'app_name' => $settings['app_name'] ?? 'OpenWishlist',
+                'max_file_size' => $settings['max_file_size'] ?? 5242880,
+                'allowed_domains' => $settings['allowed_domains'] ?? [],
+                'public_registration' => $settings['public_registration'] ?? true
+            ];
+            
+            Router::json($publicSettings);
+        } catch (\Throwable $e) {
+            Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Failed to load settings.'], 500);
+        }
+    }
+
+    public function apiUpdateSettings(): void
+    {
+        $this->requireAdmin();
+        
+        try {
+            $input = Router::inputJson();
+            $settings = \OpenWishlist\Support\Settings::load($this->pdo);
+            
+            // Update only allowed settings
+            if (isset($input['app_name'])) {
+                $settings['app_name'] = trim($input['app_name']);
+            }
+            if (isset($input['max_file_size'])) {
+                $maxSize = (int)$input['max_file_size'];
+                if ($maxSize > 0 && $maxSize <= 52428800) { // Max 50MB
+                    $settings['max_file_size'] = $maxSize;
+                }
+            }
+            if (isset($input['public_registration'])) {
+                $settings['public_registration'] = (bool)$input['public_registration'];
+            }
+            if (isset($input['allowed_domains']) && is_array($input['allowed_domains'])) {
+                $settings['allowed_domains'] = array_filter($input['allowed_domains'], 'is_string');
+            }
+            
+            \OpenWishlist\Support\Settings::save($this->pdo, $settings);
+            
+            Router::json(['message' => 'Settings updated successfully.']);
+        } catch (\Throwable $e) {
+            Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Failed to update settings.'], 500);
+        }
     }
 
 }

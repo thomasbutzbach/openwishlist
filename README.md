@@ -7,7 +7,7 @@
 - **Modern** stack: PHP 8.2+, SSR + Vanilla JS, REST API
 
 ## Status
-🧭 Planning & early development. See `docs/adr` for architecture decisions.
+✅ **Ready for production use!** Full REST API, comprehensive test suite, robust job system. See `docs/adr` for architecture decisions.
 
 ## Goals (MVP)
 - Session-based auth (browser)
@@ -88,9 +88,47 @@ php bin/worker --max-jobs=20 --max-seconds=60 --type=image.fetch
 
 ---
 
+## Testing
+
+OpenWishlist includes a comprehensive API test suite with automatic cleanup.
+
+### Run Tests
+```bash
+composer test              # All tests
+composer test:auth         # Authentication tests  
+composer test:wishlists    # Wishlist CRUD tests
+composer test:wishes       # Wish CRUD tests
+composer test:public       # Public API tests
+```
+
+### Test Requirements
+- Server must be running (`composer start`)
+- Uses lightweight custom test framework (no PHPUnit dependency)
+- Tests automatically clean up after themselves
+
+### Test Data Cleanup
+```bash
+composer test:cleanup:dry  # Preview test data to be cleaned
+composer test:cleanup      # Remove all test data from database
+```
+
+The cleanup script removes:
+- Test users (emails matching `test%` or `%test_%`)  
+- Associated wishlists, wishes, and jobs
+- Uses database transactions for safety
+
+### Test Coverage
+- **41 comprehensive tests** covering all API endpoints
+- HTTP status codes, JSON responses, validation
+- Authentication, authorization, CRUD operations
+- Public API access and edge cases
+
+---
+
 ## Development Workflow (short)
 
 1. Create a feature branch.  
 2. Update `api/openapi.yml` (and code as needed).  
 3. Preview with Swagger UI (`./scripts/swagger-ui.sh`).  
-4. Open a PR; CI must pass; merge to `main`.
+4. Run tests (`composer test`) to ensure functionality.
+5. Open a PR; CI must pass; merge to `main`.

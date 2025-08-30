@@ -21,6 +21,16 @@ final class WishlistController
         return $uid;
     }
 
+    private function requireApiAuth(): int
+    {
+        $uid = Session::userId();
+        if (!$uid) {
+            Router::json(['type' => 'about:blank', 'title' => 'Unauthorized', 'status' => 401, 'detail' => 'Authentication required.'], 401);
+            exit;
+        }
+        return $uid;
+    }
+
     public function index(): void
     {
         $uid = $this->requireAuth();
@@ -350,5 +360,205 @@ final class WishlistController
             return;
         }
         require $tpl;
+    }
+
+    // === API Methods ===
+
+    public function apiIndex(): void
+    {
+        $uid = $this->requireApiAuth();
+        
+        $stmt = $this->pdo->prepare('SELECT id, title, description, is_public, created_at FROM wishlists WHERE user_id = :uid ORDER BY created_at DESC');
+        $stmt->execute(['uid' => $uid]);
+        $wishlists = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Convert to proper types
+        foreach ($wishlists as &$wl) {
+            $wl['id'] = (int)$wl['id'];
+            $wl['is_public'] = (bool)$wl['is_public'];
+        }
+        
+        Router::json(['wishlists' => $wishlists]);
+    }
+
+    public function apiCreate(): void
+    {
+        $uid = $this->requireApiAuth();
+        
+        try {
+            $input = Router::inputJson();
+            $title = trim($input['title'] ?? '');
+            $description = trim($input['description'] ?? '');
+            $isPublic = (bool)($input['is_public'] ?? false);
+            
+            if ($title === '') {
+                Router::json(['type' => 'about:blank', 'title' => 'Validation Error', 'status' => 400, 'detail' => 'Title is required.'], 400);
+                return;
+            }
+            
+            $shareSlug = $isPublic ? $this->uniqueSlug() : null;
+            
+            $stmt = $this->pdo->prepare('INSERT INTO wishlists (user_id, title, description, is_public, share_slug) VALUES (:uid, :title, :desc, :pub, :slug)');
+            $stmt->execute([
+                'uid' => $uid,
+                'title' => $title,
+                'desc' => $description,
+                'pub' => $isPublic ? 1 : 0,
+                'slug' => $shareSlug
+            ]);
+            
+            $id = (int)$this->pdo->lastInsertId();
+            
+            Router::json([
+                'id' => $id,
+                'title' => $title,
+                'description' => $description,
+                'is_public' => $isPublic,
+                'share_slug' => $shareSlug
+            ], 201);
+            
+        } catch (\Throwable $e) {
+            Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Failed to create wishlist.'], 500);
+        }
+    }
+
+    public function apiShow(array $params): void
+    {
+        $uid = $this->requireApiAuth();
+        $wl = $this->getOwned((int)$params['id'], $uid);
+        
+        if (!$wl) {
+            Router::json(['type' => 'about:blank', 'title' => 'Not Found', 'status' => 404, 'detail' => 'Wishlist not found.'], 404);
+            return;
+        }
+        
+        // Get wishes for this wishlist
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id = :wl ORDER BY COALESCE(priority, 999) ASC, created_at DESC');
+        $stmt->execute(['wl' => $wl['id']]);
+        $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Convert types
+        foreach ($wishes as &$wish) {
+            $wish['id'] = (int)$wish['id'];
+            $wish['wishlist_id'] = (int)$wish['wishlist_id'];
+            $wish['priority'] = $wish['priority'] ? (int)$wish['priority'] : null;
+            $wish['price_cents'] = $wish['price_cents'] ? (int)$wish['price_cents'] : null;
+        }
+        
+        $wl['id'] = (int)$wl['id'];
+        $wl['user_id'] = (int)$wl['user_id'];
+        $wl['is_public'] = (bool)$wl['is_public'];
+        $wl['wishes'] = $wishes;
+        
+        Router::json($wl);
+    }
+
+    public function apiUpdate(array $params): void
+    {
+        $uid = $this->requireApiAuth();
+        $wl = $this->getOwned((int)$params['id'], $uid);
+        
+        if (!$wl) {
+            Router::json(['type' => 'about:blank', 'title' => 'Not Found', 'status' => 404, 'detail' => 'Wishlist not found.'], 404);
+            return;
+        }
+        
+        try {
+            $input = Router::inputJson();
+            $title = trim($input['title'] ?? $wl['title']);
+            $description = trim($input['description'] ?? $wl['description']);
+            $isPublic = isset($input['is_public']) ? (bool)$input['is_public'] : (bool)$wl['is_public'];
+            
+            if ($title === '') {
+                Router::json(['type' => 'about:blank', 'title' => 'Validation Error', 'status' => 400, 'detail' => 'Title is required.'], 400);
+                return;
+            }
+            
+            // Handle slug generation
+            $shareSlug = $wl['share_slug'];
+            if ($isPublic && !$shareSlug) {
+                $shareSlug = $this->uniqueSlug();
+            } elseif (!$isPublic) {
+                $shareSlug = null;
+            }
+            
+            $stmt = $this->pdo->prepare('UPDATE wishlists SET title = :title, description = :desc, is_public = :pub, share_slug = :slug WHERE id = :id');
+            $stmt->execute([
+                'id' => $wl['id'],
+                'title' => $title,
+                'desc' => $description,
+                'pub' => $isPublic ? 1 : 0,
+                'slug' => $shareSlug
+            ]);
+            
+            Router::json([
+                'id' => (int)$wl['id'],
+                'title' => $title,
+                'description' => $description,
+                'is_public' => $isPublic,
+                'share_slug' => $shareSlug
+            ]);
+            
+        } catch (\Throwable $e) {
+            Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Failed to update wishlist.'], 500);
+        }
+    }
+
+    public function apiDelete(array $params): void
+    {
+        $uid = $this->requireApiAuth();
+        $wl = $this->getOwned((int)$params['id'], $uid);
+        
+        if (!$wl) {
+            Router::json(['type' => 'about:blank', 'title' => 'Not Found', 'status' => 404, 'detail' => 'Wishlist not found.'], 404);
+            return;
+        }
+        
+        try {
+            // Delete wishes first (foreign key constraint)
+            $stmt = $this->pdo->prepare('DELETE FROM wishes WHERE wishlist_id = :id');
+            $stmt->execute(['id' => $wl['id']]);
+            
+            // Delete wishlist
+            $stmt = $this->pdo->prepare('DELETE FROM wishlists WHERE id = :id');
+            $stmt->execute(['id' => $wl['id']]);
+            
+            Router::status(204); // No Content
+            
+        } catch (\Throwable $e) {
+            Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Failed to delete wishlist.'], 500);
+        }
+    }
+
+    public function apiPublicBySlug(array $params): void
+    {
+        $slug = $params['slug'] ?? '';
+        $stmt = $this->pdo->prepare('SELECT id, title, description, is_public, share_slug, created_at FROM wishlists WHERE share_slug = :s AND is_public = 1');
+        $stmt->execute(['s' => $slug]);
+        $wl = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$wl) {
+            Router::json(['type' => 'about:blank', 'title' => 'Not Found', 'status' => 404, 'detail' => 'Public wishlist not found.'], 404);
+            return;
+        }
+        
+        // Get wishes
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id = :wl ORDER BY priority ASC, id ASC');
+        $stmt->execute(['wl' => $wl['id']]);
+        $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Convert types
+        foreach ($wishes as &$wish) {
+            $wish['id'] = (int)$wish['id'];
+            $wish['wishlist_id'] = (int)$wish['wishlist_id'];
+            $wish['priority'] = $wish['priority'] ? (int)$wish['priority'] : null;
+            $wish['price_cents'] = $wish['price_cents'] ? (int)$wish['price_cents'] : null;
+        }
+        
+        $wl['id'] = (int)$wl['id'];
+        $wl['is_public'] = true;
+        $wl['wishes'] = $wishes;
+        
+        Router::json($wl);
     }
 }

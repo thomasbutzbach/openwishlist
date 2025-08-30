@@ -13,6 +13,13 @@
     }
   },
   "scripts": {
-    "start": "php -S 127.0.0.1:8080 -t public"
+    "start": "php -S 127.0.0.1:8080 -t public",
+    "test": "php tests/run-tests.php",
+    "test:auth": "php tests/run-tests.php AuthApiTest",
+    "test:wishlists": "php tests/run-tests.php WishlistApiTest",
+    "test:wishes": "php tests/run-tests.php WishApiTest",
+    "test:public": "php tests/run-tests.php PublicApiTest",
+    "test:cleanup": "php bin/cleanup-testdata",
+    "test:cleanup:dry": "php bin/cleanup-testdata --dry-run"
   }
 }
