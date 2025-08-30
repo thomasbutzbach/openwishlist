@@ -200,7 +200,7 @@ final class WishController
         ]);
 
         Session::flash('success', 'Wish updated.');
-        Router::redirect('/wishes/'.$wish['id'].'/edit');
+        Router::redirect('/wishlists/'.$wish['wishlist_id']);
     }
 
     public function delete(array $params): void
