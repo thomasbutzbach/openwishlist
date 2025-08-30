@@ -10,6 +10,7 @@ composer.lock
 .idea/
 .vscode/
 .DS_Store
+CLAUDE.md
 
 # Cache / test artifacts
 coverage/
