@@ -21,6 +21,9 @@ final class Jobs
         try {
             $this->pdo->beginTransaction();
 
+            // Erst zombie jobs aufräumen (processing > 5 Minuten)
+            $this->reclaimZombieJobs();
+
             // Suche nach queued Job des gewünschten Typs
             $sql = "SELECT id, type, payload FROM jobs 
                     WHERE type = :type AND status = 'queued' AND run_at <= NOW()
@@ -81,10 +84,10 @@ final class Jobs
         $attempts = (int)$stmt->fetchColumn();
 
         if ($attempts >= $maxAttempts) {
-            // Nach max attempts: Job endgültig failed aber LÖSCHEN (nicht blockieren)
-            $sql = "DELETE FROM jobs WHERE id = :id";
+            // Nach max attempts: Job endgültig als 'failed' markieren (Dead Letter Queue)
+            $sql = "UPDATE jobs SET status = 'failed', last_error = :err, finished_at = NOW() WHERE id = :id";
             $st = $this->pdo->prepare($sql);
-            $st->execute(['id' => $id]);
+            $st->execute(['id' => $id, 'err' => $reason]);
             return;
         }
 
@@ -97,10 +100,10 @@ final class Jobs
             $st = $this->pdo->prepare($sql);
             $st->execute(['id' => $id, 'err' => $reason, 'sec' => $backoffSeconds]);
         } else {
-            // Job sofort löschen (nicht failed status der System blockiert)
-            $sql = "DELETE FROM jobs WHERE id = :id";
+            // Job sofort als 'failed' markieren (keine Retries)
+            $sql = "UPDATE jobs SET status = 'failed', last_error = :err, finished_at = NOW() WHERE id = :id";
             $st = $this->pdo->prepare($sql);
-            $st->execute(['id' => $id]);
+            $st->execute(['id' => $id, 'err' => $reason]);
         }
     }
 
@@ -175,6 +178,19 @@ final class Jobs
         return $st->rowCount();
     }
 
+    /** Zombie-Jobs aufräumen: processing jobs die > 5 Minuten laufen zurück auf queued. */
+    private function reclaimZombieJobs(int $timeoutMinutes = 5): int
+    {
+        $sql = "UPDATE jobs 
+                SET status = 'queued', started_at = NULL 
+                WHERE status = 'processing' 
+                AND started_at IS NOT NULL 
+                AND started_at < DATE_SUB(NOW(), INTERVAL :timeout MINUTE)";
+        $st = $this->pdo->prepare($sql);
+        $st->execute(['timeout' => $timeoutMinutes]);
+        return $st->rowCount();
+    }
+
     /** Entferne Jobs für nicht-existierende Wishes. */
     public function cleanupOrphanedJobs(): int
     {
@@ -186,5 +202,11 @@ final class Jobs
         $st = $this->pdo->prepare($sql);
         $st->execute();
         return $st->rowCount();
+    }
+
+    /** Manuelle Zombie-Job-Bereinigung für Admin-Interface. */
+    public function reclaimZombies(int $timeoutMinutes = 5): int
+    {
+        return $this->reclaimZombieJobs($timeoutMinutes);
     }
 }

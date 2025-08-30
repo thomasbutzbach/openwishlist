@@ -62,7 +62,8 @@ final class AdminController
         $settings = \OpenWishlist\Support\Settings::load($this->pdo);
         $processor = new \OpenWishlist\Domain\ImageProcessor($this->pdo, $settings);
 
-        // Erst alte/orphaned Jobs aufräumen, dann neue erstellen
+        // Erst zombies/orphaned Jobs aufräumen, dann neue erstellen
+        $zombies = $jobs->reclaimZombies(5);
         $cleaned = $jobs->cleanupOrphanedJobs();
         $seeded = $jobs->seedImageFetchBatch(50);
         
@@ -88,7 +89,7 @@ final class AdminController
             }
         }
 
-        $message = "Cleaned $cleaned orphaned job(s), seeded $seeded job(s), processed $processed job(s).";
+        $message = "Reclaimed $zombies zombie job(s), cleaned $cleaned orphaned job(s), seeded $seeded job(s), processed $processed job(s).";
         if (!empty($errors)) {
             $message .= " Errors: " . implode('; ', $errors);
         }
