@@ -184,7 +184,11 @@ final class WishlistController
         $stmt = $this->pdo->prepare('SELECT id,user_id,title,description,is_public,share_slug,created_at FROM wishlists WHERE share_slug=:s AND is_public=1');
         $stmt->execute(['s' => $slug]);
         $wl = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$wl) { Router::status(404); echo 'Not found'; return; }
+        if (!$wl) { 
+            Router::status(404); 
+            View::render('404', ['title' => 'Wishlist Not Found']);
+            return; 
+        }
 
         // Load wishes for this public wishlist
         $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wid ORDER BY priority ASC, id ASC');
