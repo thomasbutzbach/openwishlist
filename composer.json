@@ -1,28 +1,28 @@
 {
-  "name": "thomasbutzbach/openwishlist",
-  "version": "0.9.0",
-  "description": "OpenWishlist – transparent, self-hostable wishlist app.",
-  "type": "project",
-  "license": "AGPL-3.0-or-later",
-  "require": {
-    "php": "^8.2",
-    "ext-pdo": "*"
-  },
-  "autoload": {
-    "psr-4": {
-      "OpenWishlist\\": "src/"
+    "name": "thomasbutzbach/openwishlist",
+    "version": "1.0.0",
+    "description": "OpenWishlist \u2013 transparent, self-hostable wishlist app.",
+    "type": "project",
+    "license": "AGPL-3.0-or-later",
+    "require": {
+        "php": "^8.2",
+        "ext-pdo": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "OpenWishlist\\": "src/"
+        }
+    },
+    "scripts": {
+        "start": "php -S 127.0.0.1:8080 -t public",
+        "test": "php tests/run-tests.php",
+        "test:auth": "php tests/run-tests.php AuthApiTest",
+        "test:wishlists": "php tests/run-tests.php WishlistApiTest",
+        "test:wishes": "php tests/run-tests.php WishApiTest",
+        "test:public": "php tests/run-tests.php PublicApiTest",
+        "test:cleanup": "php bin/cleanup-testdata",
+        "test:cleanup:dry": "php bin/cleanup-testdata --dry-run",
+        "version": "php -r \"require_once 'vendor/autoload.php'; echo \\OpenWishlist\\Support\\Version::current() . PHP_EOL;\"",
+        "version:set": "php bin/set-version"
     }
-  },
-  "scripts": {
-    "start": "php -S 127.0.0.1:8080 -t public",
-    "test": "php tests/run-tests.php",
-    "test:auth": "php tests/run-tests.php AuthApiTest",
-    "test:wishlists": "php tests/run-tests.php WishlistApiTest",
-    "test:wishes": "php tests/run-tests.php WishApiTest",
-    "test:public": "php tests/run-tests.php PublicApiTest",
-    "test:cleanup": "php bin/cleanup-testdata",
-    "test:cleanup:dry": "php bin/cleanup-testdata --dry-run",
-    "version": "php -r \"require_once 'vendor/autoload.php'; echo \\OpenWishlist\\Support\\Version::current() . PHP_EOL;\"",
-    "version:set": "php bin/set-version"
-  }
 }
