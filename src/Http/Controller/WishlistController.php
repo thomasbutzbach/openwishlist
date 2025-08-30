@@ -35,14 +35,64 @@ final class WishlistController
     {
         $uid = $this->requireAuth();
 
-        $stmt = $this->pdo->prepare('SELECT id,title,is_public,share_slug,created_at FROM wishlists WHERE user_id=:u ORDER BY created_at DESC');
-        $stmt->execute(['u' => $uid]);
+        // Search
+        $search = trim($_GET['search'] ?? '');
+        
+        // Pagination
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = 10;
+        $offset = ($page - 1) * $perPage;
+
+        // Build search conditions
+        $whereConditions = ['user_id = :u'];
+        $params = ['u' => $uid];
+        
+        if ($search !== '') {
+            $whereConditions[] = '(title LIKE :search OR description LIKE :search)';
+            $params['search'] = '%' . $search . '%';
+        }
+        
+        $whereClause = implode(' AND ', $whereConditions);
+
+        // Get total count
+        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM wishlists WHERE $whereClause");
+        $countStmt->execute($params);
+        $totalCount = (int)$countStmt->fetchColumn();
+
+        // Get paginated results
+        $stmt = $this->pdo->prepare("
+            SELECT id,title,is_public,share_slug,created_at,description 
+            FROM wishlists 
+            WHERE $whereClause
+            ORDER BY created_at DESC 
+            LIMIT :limit OFFSET :offset
+        ");
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(":$key", $value);
+        }
+        $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
         $lists = $stmt->fetchAll();
+
+        // Calculate pagination info
+        $totalPages = (int)ceil($totalCount / $perPage);
+        $hasNextPage = $page < $totalPages;
+        $hasPrevPage = $page > 1;
 
         View::render('wishlists/index', [
             'title' => 'My wishlists',
             'lists' => $lists,
             'baseUrl' => rtrim($this->config['app']['base_url'] ?? '', '/'),
+            'search' => $search,
+            'pagination' => [
+                'currentPage' => $page,
+                'totalPages' => $totalPages,
+                'totalCount' => $totalCount,
+                'perPage' => $perPage,
+                'hasNextPage' => $hasNextPage,
+                'hasPrevPage' => $hasPrevPage,
+            ]
         ]);
     }
 
@@ -52,14 +102,63 @@ final class WishlistController
         $wl = $this->getOwned((int)$params['id'], $uid);
         if (!$wl) { Router::status(404); echo 'Not found'; return; }
 
-        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wl ORDER BY COALESCE(priority, 999) ASC, created_at DESC');
-        $stmt->execute(['wl' => $wl['id']]);
+        // Search wishes
+        $search = trim($_GET['search'] ?? '');
+        
+        // Pagination for wishes
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = 20;
+        $offset = ($page - 1) * $perPage;
+
+        // Build search conditions for wishes
+        $whereConditions = ['wishlist_id = :wl'];
+        $params = ['wl' => $wl['id']];
+        
+        if ($search !== '') {
+            $whereConditions[] = '(title LIKE :search OR notes LIKE :search OR url LIKE :search)';
+            $params['search'] = '%' . $search . '%';
+        }
+        
+        $whereClause = implode(' AND ', $whereConditions);
+
+        // Get total count of wishes
+        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM wishes WHERE $whereClause");
+        $countStmt->execute($params);
+        $totalCount = (int)$countStmt->fetchColumn();
+
+        // Get paginated wishes
+        $stmt = $this->pdo->prepare("
+            SELECT * FROM wishes 
+            WHERE $whereClause
+            ORDER BY COALESCE(priority, 999) ASC, created_at DESC 
+            LIMIT :limit OFFSET :offset
+        ");
+        foreach ($params as $key => $value) {
+            $stmt->bindValue(":$key", $value);
+        }
+        $stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
         $wishes = $stmt->fetchAll();
+
+        // Calculate pagination info
+        $totalPages = (int)ceil($totalCount / $perPage);
+        $hasNextPage = $page < $totalPages;
+        $hasPrevPage = $page > 1;
 
         View::render('wishlists/show', [
             'title' => $wl['title'],
             'wl' => $wl,
             'wishes' => $wishes,
+            'search' => $search,
+            'pagination' => [
+                'currentPage' => $page,
+                'totalPages' => $totalPages,
+                'totalCount' => $totalCount,
+                'perPage' => $perPage,
+                'hasNextPage' => $hasNextPage,
+                'hasPrevPage' => $hasPrevPage,
+            ]
         ]);
     }
 

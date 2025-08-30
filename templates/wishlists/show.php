@@ -14,6 +14,16 @@
    <a href="/wishlists/<?= (int)$wl['id'] ?>/export/json">Export JSON</a> ·
    <a href="/wishlists/<?= (int)$wl['id'] ?>/export/pdf" target="_blank">Export PDF</a></p>
 
+<form method="GET" style="margin-bottom: 1rem;">
+  <div class="grid">
+    <input type="search" name="search" placeholder="Search wishes..." value="<?= htmlspecialchars($search ?? '') ?>">
+    <button type="submit">Search</button>
+  </div>
+  <?php if (!empty($search)): ?>
+    <small><a href="?">Clear search</a></small>
+  <?php endif; ?>
+</form>
+
 <?php if (empty($wishes)): ?>
   <p><em>No wishes yet.</em></p>
 <?php else: ?>
@@ -44,6 +54,23 @@
         <!-- Content -->
         <div>
           <header>
+            <?php if ($w['priority']): ?>
+              <?php
+              $priorityLabel = '';
+              $priorityColor = '#999';
+              $priorityIcon = '';
+              
+              switch((int)$w['priority']) {
+                case 1: $priorityLabel = 'Highest'; $priorityColor = '#dc3545'; $priorityIcon = '🔴'; break;
+                case 2: $priorityLabel = 'High'; $priorityColor = '#fd7e14'; $priorityIcon = '🟠'; break;  
+                case 3: $priorityLabel = 'Medium'; $priorityColor = '#ffc107'; $priorityIcon = '🟡'; break;
+                case 4: $priorityLabel = 'Low'; $priorityColor = '#20c997'; $priorityIcon = '🟢'; break;
+                case 5: $priorityLabel = 'Lowest'; $priorityColor = '#6c757d'; $priorityIcon = '⚫'; break;
+              }
+              ?>
+              <small style="color: <?= $priorityColor ?>; font-weight: bold; font-size: 0.8em;"><?= $priorityIcon ?> <?= $priorityLabel ?></small>
+            <?php endif; ?>
+            
             <h4>
               <?php if (!empty($w['url'])): ?>
                 <a href="<?= htmlspecialchars($w['url']) ?>" target="_blank">
@@ -65,9 +92,6 @@
               <?php if (isset($w['price_cents'])): ?>
                 <li><strong>Price:</strong> €<?= number_format(((int)$w['price_cents'])/100, 2, ',', '.') ?></li>
               <?php endif; ?>
-              <?php if ($w['priority']): ?>
-                <li><strong>Priority:</strong> <?= (int)$w['priority'] ?>/5</li>
-              <?php endif; ?>
               <li><strong>Image Mode:</strong> <?= htmlspecialchars($w['image_mode']) ?></li>
             </ul>
           </details>
@@ -83,4 +107,48 @@
       </div>
     </article>
   <?php endforeach; ?>
+  
+  <?php if ($pagination['totalPages'] > 1): ?>
+    <nav aria-label="Pagination">
+      <ul style="display: flex; justify-content: center; align-items: center; gap: 0.5rem; list-style: none; padding: 0;">
+        <?php if ($pagination['hasPrevPage']): ?>
+          <li><a href="?page=<?= $pagination['currentPage'] - 1 ?><?= !empty($search) ? '&search=' . urlencode($search) : '' ?>" role="button" class="secondary">← Previous</a></li>
+        <?php endif; ?>
+        
+        <?php
+        $start = max(1, $pagination['currentPage'] - 2);
+        $end = min($pagination['totalPages'], $pagination['currentPage'] + 2);
+        $searchParam = !empty($search) ? '&search=' . urlencode($search) : '';
+        ?>
+        
+        <?php if ($start > 1): ?>
+          <li><a href="?page=1<?= $searchParam ?>" role="button" class="outline">1</a></li>
+          <?php if ($start > 2): ?><li>...</li><?php endif; ?>
+        <?php endif; ?>
+        
+        <?php for ($i = $start; $i <= $end; $i++): ?>
+          <li>
+            <?php if ($i === $pagination['currentPage']): ?>
+              <span role="button" aria-current="page"><?= $i ?></span>
+            <?php else: ?>
+              <a href="?page=<?= $i ?><?= $searchParam ?>" role="button" class="outline"><?= $i ?></a>
+            <?php endif; ?>
+          </li>
+        <?php endfor; ?>
+        
+        <?php if ($end < $pagination['totalPages']): ?>
+          <?php if ($end < $pagination['totalPages'] - 1): ?><li>...</li><?php endif; ?>
+          <li><a href="?page=<?= $pagination['totalPages'] ?><?= $searchParam ?>" role="button" class="outline"><?= $pagination['totalPages'] ?></a></li>
+        <?php endif; ?>
+        
+        <?php if ($pagination['hasNextPage']): ?>
+          <li><a href="?page=<?= $pagination['currentPage'] + 1 ?><?= $searchParam ?>" role="button" class="secondary">Next →</a></li>
+        <?php endif; ?>
+      </ul>
+      <p style="text-align: center; margin-top: 0.5rem; color: #666; font-size: 0.9em;">
+        Showing <?= min($pagination['perPage'], $pagination['totalCount'] - ($pagination['currentPage'] - 1) * $pagination['perPage']) ?> 
+        of <?= $pagination['totalCount'] ?> wishes
+      </p>
+    </nav>
+  <?php endif; ?>
 <?php endif; ?>

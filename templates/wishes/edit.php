@@ -47,7 +47,6 @@
   </fieldset>
   <div class="row">
     <button type="submit">Save</button>
-    <a href="/wishlists/<?= (int)$wish['wishlist_id'] ?>">Back</a>
   </div>
 </form>
 

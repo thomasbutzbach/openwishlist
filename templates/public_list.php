@@ -44,6 +44,23 @@
         <!-- Content -->
         <div>
           <header>
+            <?php if ($w['priority']): ?>
+              <?php
+              $priorityLabel = '';
+              $priorityColor = '#999';
+              $priorityIcon = '';
+              
+              switch((int)$w['priority']) {
+                case 1: $priorityLabel = 'Highest'; $priorityColor = '#dc3545'; $priorityIcon = '🔴'; break;
+                case 2: $priorityLabel = 'High'; $priorityColor = '#fd7e14'; $priorityIcon = '🟠'; break;  
+                case 3: $priorityLabel = 'Medium'; $priorityColor = '#ffc107'; $priorityIcon = '🟡'; break;
+                case 4: $priorityLabel = 'Low'; $priorityColor = '#20c997'; $priorityIcon = '🟢'; break;
+                case 5: $priorityLabel = 'Lowest'; $priorityColor = '#6c757d'; $priorityIcon = '⚫'; break;
+              }
+              ?>
+              <small style="color: <?= $priorityColor ?>; font-weight: bold; font-size: 0.8em;"><?= $priorityIcon ?> <?= $priorityLabel ?></small>
+            <?php endif; ?>
+            
             <h4>
               <?php if (!empty($w['url'])): ?>
                 <a href="<?= htmlspecialchars($w['url']) ?>" target="_blank">
@@ -64,9 +81,6 @@
             <ul>
               <?php if (isset($w['price_cents'])): ?>
                 <li><strong>Price:</strong> €<?= number_format(((int)$w['price_cents'])/100, 2, ',', '.') ?></li>
-              <?php endif; ?>
-              <?php if ($w['priority']): ?>
-                <li><strong>Priority:</strong> <?= (int)$w['priority'] ?>/5</li>
               <?php endif; ?>
               <li><strong>Image Mode:</strong> <?= htmlspecialchars($w['image_mode']) ?></li>
             </ul>
