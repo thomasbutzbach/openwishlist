@@ -45,7 +45,7 @@
       <?php require $tpl; ?>
     </div>
     <p style="margin-top:1rem;color:#666">
-      Source: <a href="https://github.com/thomasbutzbach/openwishlist">OpenWishlist</a> – AGPLv3-or-later
+      Source: <a href="https://github.com/thomasbutzbach/openwishlist">OpenWishlist</a> <?= \OpenWishlist\Support\Version::formatDisplay() ?> – AGPLv3-or-later
     </p>
     </main>
 

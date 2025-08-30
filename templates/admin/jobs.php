@@ -1,4 +1,4 @@
-<h1>Jobs</h1>
+<h1>Jobs <small style="color: #666; font-weight: normal;"><?= \OpenWishlist\Support\Version::formatDisplay() ?></small></h1>
 
 <section>
   <h2>Statistics</h2>
