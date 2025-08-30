@@ -59,6 +59,35 @@ Propose API changes by updating `api/openapi.yml` in a PR first. Once agreed, im
 
 ---
 
+## Job System
+
+OpenWishlist uses a robust database-backed job queue for background tasks like image processing.
+
+### Job Worker
+```bash
+php bin/worker --verbose
+# Process background jobs (default: max 10 jobs, 30 seconds)
+
+php bin/worker --max-jobs=20 --max-seconds=60 --type=image.fetch
+# Custom limits and job type
+```
+
+### Job Lifecycle
+- **queued** → **processing** → **completed** (success)
+- **queued** → **processing** → **failed** (after max attempts)
+- **Zombie recovery**: Processing jobs older than 5 minutes are automatically reclaimed
+
+### Features
+- **Exponential backoff**: Failed jobs retry with increasing delays (2min, 4min, 8min, etc.)
+- **Dead letter queue**: Jobs failing after max attempts are marked as `failed` (not deleted)
+- **Zombie detection**: Crashed worker jobs are automatically recovered
+- **Admin interface**: Monitor and manually trigger jobs at `/admin/jobs`
+
+### Job Types
+- `image.fetch`: Downloads and processes local images for wishes
+
+---
+
 ## Development Workflow (short)
 
 1. Create a feature branch.  
