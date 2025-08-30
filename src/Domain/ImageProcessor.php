@@ -27,8 +27,28 @@ final class ImageProcessor
         $this->pdo->commit();
 
         $timeout = (int)($this->settings['uploads.timeoutSec'] ?? 15);
-        $maxBytes = (int)($this->settings['uploads.maxBytes'] ?? 5*1024*1024);
+        $maxBytes = (int)($this->settings['max_file_size'] ?? 5*1024*1024);
         $allowed  = (array)($this->settings['uploads.allowedMimes'] ?? ['image/jpeg','image/png','image/webp','image/gif']);
+        $allowedDomains = (array)($this->settings['allowed_domains'] ?? []);
+
+        // Validate domain if restrictions are set
+        if (!empty($allowedDomains)) {
+            $parsedUrl = parse_url($url);
+            $domain = strtolower($parsedUrl['host'] ?? '');
+            
+            $domainAllowed = false;
+            foreach ($allowedDomains as $allowedDomain) {
+                $allowedDomain = strtolower(trim($allowedDomain));
+                if ($domain === $allowedDomain || str_ends_with($domain, '.' . $allowedDomain)) {
+                    $domainAllowed = true;
+                    break;
+                }
+            }
+            
+            if (!$domainAllowed) {
+                throw new RuntimeException("Domain not allowed: $domain");
+            }
+        }
 
         [$bytes, $mime] = $this->download($url, $timeout, $maxBytes);
         if (!in_array($mime, $allowed, true)) throw new RuntimeException("disallowed mime: $mime");

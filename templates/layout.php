@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title><?= htmlspecialchars($title ?? 'OpenWishlist') ?></title>
+  <title><?= htmlspecialchars($title ?? ($appSettings['app_name'] ?? 'OpenWishlist')) ?></title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/assets/css/pico.min.css">
 </head>
@@ -11,7 +11,7 @@
   <main class="container">
     <nav>
       <ul>
-        <li><strong><a href="/">🎁 OpenWishlist</a></strong></li>
+        <li><strong><a href="/">🎁 <?= htmlspecialchars($appSettings['app_name'] ?? 'OpenWishlist') ?></a></strong></li>
       </ul>
       <ul>
         <?php if (\OpenWishlist\Support\Session::userId()): ?>
@@ -25,7 +25,9 @@
           </li>
         <?php else: ?>
           <li><a href="/login">Login</a></li>
-          <li><a href="/register">Register</a></li>
+          <?php if ($appSettings['public_registration'] ?? true): ?>
+            <li><a href="/register">Register</a></li>
+          <?php endif; ?>
         <?php endif; ?>
       </ul>
     </nav>

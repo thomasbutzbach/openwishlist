@@ -9,6 +9,7 @@ use OpenWishlist\Http\Controller\WishController;
 use OpenWishlist\Http\Controller\AdminController;
 use OpenWishlist\Support\Session;
 use OpenWishlist\Support\Db;
+use OpenWishlist\Support\View;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -30,6 +31,9 @@ Session::start($config['session'] ?? []);
 
 // Prepare DB (PDO)
 $pdo = Db::connect($config['db']);
+
+// Set PDO for global settings access in templates
+View::setPdo($pdo);
 
 // Router
 $router = new Router();
@@ -74,8 +78,10 @@ $router->post('/wishes/{id}', [$wish, 'update']);
 $router->post('/wishes/{id}/delete', [$wish, 'delete']);
 
 $admin = new AdminController($pdo, $config);
+$router->get('/admin', [$admin, 'dashboard']);
 $router->get('/admin/jobs', [$admin, 'jobsPage']);
 $router->post('/admin/jobs/run', [$admin, 'runJobs']);
+$router->get('/admin/settings', [$admin, 'settingsPage']);
 
 // === API Routes ===
 
@@ -104,6 +110,8 @@ $router->get('/api/public/lists/{slug}', [$wl, 'apiPublicBySlug']);
 // API Admin
 $router->get('/api/admin/settings', [$admin, 'apiGetSettings']);
 $router->put('/api/admin/settings', [$admin, 'apiUpdateSettings']);
+$router->delete('/api/admin/jobs/{id}', [$admin, 'apiDeleteJob']);
+$router->post('/api/admin/jobs/cleanup', [$admin, 'apiCleanupJobs']);
 
 // Dispatch
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
