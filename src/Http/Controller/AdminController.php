@@ -55,6 +55,19 @@ final class AdminController
             FROM wishes
         ')->fetch(\PDO::FETCH_ASSOC);
         
+        // Image mode statistics
+        $imageStats = $this->pdo->query('
+            SELECT 
+                image_mode,
+                COUNT(*) as count,
+                SUM(CASE WHEN image_status = "ok" THEN 1 ELSE 0 END) as successful,
+                SUM(CASE WHEN image_status = "failed" THEN 1 ELSE 0 END) as failed,
+                SUM(CASE WHEN image_status = "pending" THEN 1 ELSE 0 END) as pending
+            FROM wishes 
+            GROUP BY image_mode
+            ORDER BY image_mode
+        ')->fetchAll(\PDO::FETCH_ASSOC);
+        
         // Job statistics
         $jobs = new \OpenWishlist\Support\Jobs($this->pdo);
         $jobStats = $jobs->getStats();
@@ -73,6 +86,7 @@ final class AdminController
             'userStats' => $userStats,
             'wishlistStats' => $wishlistStats,
             'wishStats' => $wishStats,
+            'imageStats' => $imageStats,
             'jobStats' => $jobStats,
             'recentWishlists' => $recentWishlists
         ]);
@@ -282,6 +296,56 @@ final class AdminController
         } catch (\Throwable $e) {
             Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Failed to cleanup jobs.'], 500);
         }
+    }
+
+    public function convertLinksToLocal(): void
+    {
+        $this->requireAdmin();
+        Csrf::assert();
+
+        try {
+            // Get all wishes with image_mode = 'link' and valid image_url
+            $stmt = $this->pdo->prepare('
+                SELECT id, image_url 
+                FROM wishes 
+                WHERE image_mode = :mode AND image_url IS NOT NULL AND image_url != ""
+            ');
+            $stmt->execute(['mode' => 'link']);
+            $linkWishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($linkWishes)) {
+                Session::flash('info', 'No wishes with linked images found.');
+                Router::redirect('/admin');
+                return;
+            }
+
+            // Update all wishes from 'link' to 'local' and set status to 'pending'
+            $updateStmt = $this->pdo->prepare('
+                UPDATE wishes 
+                SET image_mode = "local", image_status = "pending", image_path = NULL
+                WHERE image_mode = "link" AND image_url IS NOT NULL AND image_url != ""
+            ');
+            $updated = $updateStmt->execute();
+
+            if ($updated) {
+                $count = $updateStmt->rowCount();
+                
+                // Create image fetch jobs for all converted wishes
+                $jobs = new Jobs($this->pdo);
+                foreach ($linkWishes as $wish) {
+                    $jobs->enqueue('image.fetch', ['wishId' => (int)$wish['id']]);
+                }
+
+                Session::flash('success', "Successfully converted {$count} wishes from 'link' to 'local' mode. Image fetch jobs have been queued.");
+            } else {
+                Session::flash('error', 'Failed to convert image modes.');
+            }
+
+        } catch (\Throwable $e) {
+            Session::flash('error', 'Error during conversion: ' . $e->getMessage());
+        }
+
+        Router::redirect('/admin');
     }
 
 }

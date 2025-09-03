@@ -39,6 +39,44 @@ use OpenWishlist\Support\Version;
             <?= number_format($wishStats['wishes_with_images'] ?? 0) ?> with images, <?= number_format($wishStats['wishes_with_price'] ?? 0) ?> with price
         </p>
     </article>
+    
+    <article>
+        <header><strong>Image Modes</strong></header>
+        <?php if (empty($imageStats)): ?>
+            <p><em>No wishes with images yet</em></p>
+        <?php else: ?>
+            <?php foreach ($imageStats as $stat): ?>
+                <p style="margin: 0.25rem 0;">
+                    <strong><?= ucfirst($stat['image_mode']) ?>:</strong> <?= number_format($stat['count']) ?><br>
+                    <small style="color: #666;">
+                        <?= $stat['successful'] ?> successful, 
+                        <?= $stat['failed'] ?> failed, 
+                        <?= $stat['pending'] ?> pending
+                    </small>
+                </p>
+            <?php endforeach; ?>
+        <?php endif; ?>
+        
+        <?php
+        $linkCount = 0;
+        foreach ($imageStats as $stat) {
+            if ($stat['image_mode'] === 'link') {
+                $linkCount = (int)$stat['count'];
+                break;
+            }
+        }
+        ?>
+        
+        <?php if ($linkCount > 0): ?>
+            <footer>
+                <form method="POST" action="/admin/convert-links-to-local" style="display: inline;" 
+                      onsubmit="return confirm('Convert all <?= $linkCount ?> linked images to local storage? This will queue background jobs to download the images.')">
+                    <?= \OpenWishlist\Support\Csrf::field() ?>
+                    <button type="submit" class="secondary">Convert <?= $linkCount ?> Links to Local</button>
+                </form>
+            </footer>
+        <?php endif; ?>
+    </article>
 </div>
 
 <div class="grid">
