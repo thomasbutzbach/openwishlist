@@ -130,7 +130,7 @@ final class WishlistController
         $stmt = $this->pdo->prepare("
             SELECT * FROM wishes 
             WHERE $whereClause
-            ORDER BY COALESCE(priority, 999) ASC, created_at DESC 
+            ORDER BY COALESCE(priority, 999) ASC, id ASC 
             LIMIT :limit OFFSET :offset
         ");
         foreach ($params as $key => $value) {
@@ -300,7 +300,7 @@ final class WishlistController
         }
 
         // Load wishes for this public wishlist
-        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wid ORDER BY priority ASC, id ASC');
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wid ORDER BY COALESCE(priority, 999) ASC, id ASC');
         $stmt->execute(['wid' => $wl['id']]);
         $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -343,7 +343,7 @@ final class WishlistController
         $wl = $this->getOwned((int)$params['id'], $uid);
         if (!$wl) { Router::status(404); echo 'Not found'; return; }
 
-        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wl ORDER BY COALESCE(priority, 999) ASC, created_at DESC');
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wl ORDER BY COALESCE(priority, 999) ASC, id ASC');
         $stmt->execute(['wl' => $wl['id']]);
         $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -395,7 +395,7 @@ final class WishlistController
         $wl = $this->getOwned((int)$params['id'], $uid);
         if (!$wl) { Router::status(404); echo 'Not found'; return; }
 
-        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wl ORDER BY COALESCE(priority, 999) ASC, created_at DESC');
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wl ORDER BY COALESCE(priority, 999) ASC, id ASC');
         $stmt->execute(['wl' => $wl['id']]);
         $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -440,7 +440,7 @@ final class WishlistController
         $wl = $this->getOwned((int)$params['id'], $uid);
         if (!$wl) { Router::status(404); echo 'Not found'; return; }
 
-        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wl ORDER BY COALESCE(priority, 999) ASC, created_at DESC');
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id=:wl ORDER BY COALESCE(priority, 999) ASC, id ASC');
         $stmt->execute(['wl' => $wl['id']]);
         $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -459,6 +459,166 @@ final class WishlistController
             return;
         }
         require $tpl;
+    }
+
+    public function importForm(array $params): void
+    {
+        $uid = $this->requireAuth();
+        $wl = $this->getOwned((int)$params['id'], $uid);
+        if (!$wl) { Router::status(404); echo 'Not found'; return; }
+
+        View::render('wishlists/import', [
+            'title' => 'Import wishes from CSV',
+            'wl' => $wl
+        ]);
+    }
+
+    public function importCsv(array $params): void
+    {
+        $uid = $this->requireAuth();
+        Csrf::assert();
+        $wl = $this->getOwned((int)$params['id'], $uid);
+        if (!$wl) { Router::status(404); echo 'Not found'; return; }
+
+        if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+            Session::flash('error', 'Please select a valid CSV file.');
+            Router::redirect('/wishlists/' . $wl['id'] . '/import');
+            return;
+        }
+
+        $file = $_FILES['csv_file'];
+        
+        // Validate file type
+        if ($file['type'] !== 'text/csv' && !str_ends_with($file['name'], '.csv')) {
+            Session::flash('error', 'Please upload a CSV file.');
+            Router::redirect('/wishlists/' . $wl['id'] . '/import');
+            return;
+        }
+
+        // Validate file size (max 1MB)
+        if ($file['size'] > 1024 * 1024) {
+            Session::flash('error', 'CSV file too large (max 1MB).');
+            Router::redirect('/wishlists/' . $wl['id'] . '/import');
+            return;
+        }
+
+        try {
+            $imported = $this->processCsvImport($file['tmp_name'], (int)$wl['id']);
+            Session::flash('success', "Successfully imported {$imported} wishes.");
+            Router::redirect('/wishlists/' . $wl['id']);
+        } catch (\Exception $e) {
+            Session::flash('error', 'Import failed: ' . $e->getMessage());
+            Router::redirect('/wishlists/' . $wl['id'] . '/import');
+        }
+    }
+
+    private function processCsvImport(string $filePath, int $wishlistId): int
+    {
+        $handle = fopen($filePath, 'r');
+        if (!$handle) {
+            throw new \Exception('Could not open CSV file');
+        }
+
+        $imported = 0;
+        $lineNumber = 0;
+
+        // Skip BOM if present
+        $firstBytes = fread($handle, 3);
+        if ($firstBytes !== "\xEF\xBB\xBF") {
+            rewind($handle);
+        }
+
+        while (($data = fgetcsv($handle, 1000, ',')) !== false) {
+            $lineNumber++;
+            
+            // Skip header row (if first row contains text like "Produktname", "Preis", etc.)
+            if ($lineNumber === 1) {
+                if (isset($data[0]) && (
+                    stripos($data[0], 'produkt') !== false || 
+                    stripos($data[0], 'title') !== false ||
+                    stripos($data[0], 'name') !== false
+                )) {
+                    continue; // Skip header row
+                }
+            }
+
+            // Validate we have at least 4 columns
+            if (count($data) < 4) {
+                continue; // Skip incomplete rows
+            }
+
+            $title = trim($data[0] ?? '');
+            $priceStr = trim($data[1] ?? '');
+            $imageUrl = trim($data[2] ?? '');
+            $url = trim($data[3] ?? '');
+
+            // Skip rows with empty title
+            if ($title === '') {
+                continue;
+            }
+
+            // Truncate title if too long
+            if (mb_strlen($title) > 190) {
+                $title = mb_substr($title, 0, 190);
+            }
+
+            // Parse price - handle both comma and dot decimal separators
+            $priceCents = null;
+            if ($priceStr !== '') {
+                // Replace comma with dot for decimal separator
+                $priceStr = str_replace(',', '.', $priceStr);
+                // Remove currency symbols and spaces
+                $priceStr = preg_replace('/[€$£¥\s]/', '', $priceStr);
+                
+                if (is_numeric($priceStr)) {
+                    $priceFloat = (float)$priceStr;
+                    if ($priceFloat >= 0 && $priceFloat <= 999999.99) {
+                        $priceCents = (int)round($priceFloat * 100);
+                    }
+                }
+            }
+
+            // Validate URL format if provided
+            if ($url !== '' && !filter_var($url, FILTER_VALIDATE_URL)) {
+                throw new \Exception("Line {$lineNumber}: Invalid URL format");
+            }
+
+            // Set image mode based on whether image URL is provided
+            $imageMode = 'none';
+            if ($imageUrl !== '') {
+                if (filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+                    $imageMode = 'link';
+                } else {
+                    throw new \Exception("Line {$lineNumber}: Invalid image URL format");
+                }
+            }
+
+            // Insert wish into database
+            $stmt = $this->pdo->prepare('
+                INSERT INTO wishes (wishlist_id, title, url, price_cents, image_mode, image_url, image_status)
+                VALUES (:wishlist_id, :title, :url, :price_cents, :image_mode, :image_url, :image_status)
+            ');
+
+            $stmt->execute([
+                'wishlist_id' => $wishlistId,
+                'title' => $title,
+                'url' => $url !== '' ? $url : null,
+                'price_cents' => $priceCents,
+                'image_mode' => $imageMode,
+                'image_url' => $imageMode === 'link' ? $imageUrl : null,
+                'image_status' => $imageMode === 'link' ? 'ok' : null
+            ]);
+
+            $imported++;
+        }
+
+        fclose($handle);
+
+        if ($imported === 0) {
+            throw new \Exception('No valid wishes found in CSV file');
+        }
+
+        return $imported;
     }
 
     // === API Methods ===
@@ -532,7 +692,7 @@ final class WishlistController
         }
         
         // Get wishes for this wishlist
-        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id = :wl ORDER BY COALESCE(priority, 999) ASC, created_at DESC');
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id = :wl ORDER BY COALESCE(priority, 999) ASC, id ASC');
         $stmt->execute(['wl' => $wl['id']]);
         $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -642,7 +802,7 @@ final class WishlistController
         }
         
         // Get wishes
-        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id = :wl ORDER BY priority ASC, id ASC');
+        $stmt = $this->pdo->prepare('SELECT * FROM wishes WHERE wishlist_id = :wl ORDER BY COALESCE(priority, 999) ASC, id ASC');
         $stmt->execute(['wl' => $wl['id']]);
         $wishes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         

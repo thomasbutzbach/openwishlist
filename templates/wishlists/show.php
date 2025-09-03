@@ -10,6 +10,7 @@
 
 <p><a href="/wishlists/<?= (int)$wl['id'] ?>/edit">Edit list</a> ·
    <a href="/wishlists/<?= (int)$wl['id'] ?>/wishes/new">Add wish</a> ·
+   <a href="/wishlists/<?= (int)$wl['id'] ?>/import">Import CSV</a> ·
    <a href="/wishlists/<?= (int)$wl['id'] ?>/export/csv">Export CSV</a> ·
    <a href="/wishlists/<?= (int)$wl['id'] ?>/export/json">Export JSON</a> ·
    <a href="/wishlists/<?= (int)$wl['id'] ?>/export/pdf" target="_blank">Export PDF</a></p>
