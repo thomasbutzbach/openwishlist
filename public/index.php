@@ -84,6 +84,7 @@ $router->get('/admin', [$admin, 'dashboard']);
 $router->get('/admin/jobs', [$admin, 'jobsPage']);
 $router->post('/admin/jobs/run', [$admin, 'runJobs']);
 $router->get('/admin/settings', [$admin, 'settingsPage']);
+$router->post('/admin/convert-links-to-local', [$admin, 'convertLinksToLocal']);
 
 // === API Routes ===
 
