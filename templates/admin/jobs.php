@@ -39,8 +39,22 @@
       <button type="submit" style="width: auto;">Run small batch now</button>
     </form>
     
-    <p>Clean up old jobs to free disk space.</p>
-    <button type="button" onclick="cleanupOldJobs()">Cleanup Old Jobs</button>
+    <p>Clean up jobs by status or age.</p>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+      <button type="button" onclick="cleanupJobsByStatus('completed')" 
+              style="background: #28a745; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px;">
+        Cleanup All Completed (<?= $stats['completed'] ?>)
+      </button>
+      <button type="button" onclick="cleanupJobsByStatus('failed')" 
+              style="background: #dc3545; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px;">
+        Cleanup All Failed (<?= $stats['failed'] ?>)
+      </button>
+      <button type="button" onclick="cleanupJobsByStatus('queued')" 
+              style="background: #ffc107; color: black; padding: 0.5rem 1rem; border: none; border-radius: 4px;">
+        Cleanup All Queued (<?= $stats['queued'] ?>)
+      </button>
+    </div>
+    <button type="button" onclick="cleanupOldJobs()" style="background: #6c757d; color: white;">Cleanup Old Jobs (by age)</button>
   </div>
   <p><small>Tip: set up a cron to run <code>php bin/worker --max-seconds=50 --max-jobs=20</code> every minute.</small></p>
 </section>
@@ -121,6 +135,45 @@ async function deleteJob(jobId) {
         }
     } catch (e) {
         alert('Network error: Failed to delete job');
+    }
+}
+
+async function cleanupJobsByStatus(status) {
+    const counts = {
+        completed: <?= $stats['completed'] ?>,
+        failed: <?= $stats['failed'] ?>,
+        queued: <?= $stats['queued'] ?>
+    };
+    
+    if (counts[status] === 0) {
+        alert(`No ${status} jobs to cleanup.`);
+        return;
+    }
+    
+    if (!confirm(`This will delete ALL ${counts[status]} ${status} jobs. Continue?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/admin/jobs/cleanup-by-status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Csrf-Token': '<?= \OpenWishlist\Support\Csrf::token() ?>'
+            },
+            body: JSON.stringify({ status: status })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            alert(result.message);
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert(`Error: ${error.detail || 'Failed to cleanup jobs'}`);
+        }
+    } catch (e) {
+        alert('Network error: Failed to cleanup jobs');
     }
 }
 
