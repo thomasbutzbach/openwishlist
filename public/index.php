@@ -66,6 +66,8 @@ $router->post('/wishlists/{id}/toggle-public', [$wl, 'togglePublic']);
 $router->get('/wishlists/{id}/export/csv', [$wl, 'exportCsv']);
 $router->get('/wishlists/{id}/export/json', [$wl, 'exportJson']);
 $router->get('/wishlists/{id}/export/pdf', [$wl, 'exportPdf']);
+$router->get('/wishlists/{id}/import', [$wl, 'importForm']);
+$router->post('/wishlists/{id}/import', [$wl, 'importCsv']);
 
 // public by slug
 $router->get('/s/{slug}', [$wl, 'publicBySlug']);
