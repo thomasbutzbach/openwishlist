@@ -115,6 +115,7 @@ $router->get('/api/admin/settings', [$admin, 'apiGetSettings']);
 $router->put('/api/admin/settings', [$admin, 'apiUpdateSettings']);
 $router->delete('/api/admin/jobs/{id}', [$admin, 'apiDeleteJob']);
 $router->post('/api/admin/jobs/cleanup', [$admin, 'apiCleanupJobs']);
+$router->post('/api/admin/jobs/cleanup-by-status', [$admin, 'apiCleanupJobsByStatus']);
 
 // Dispatch
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);

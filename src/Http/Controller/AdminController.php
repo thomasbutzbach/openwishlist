@@ -348,4 +348,29 @@ final class AdminController
         Router::redirect('/admin');
     }
 
+    public function apiCleanupJobsByStatus(): void
+    {
+        $this->requireAdmin();
+
+        try {
+            $input = Router::inputJson();
+            $status = $input['status'] ?? '';
+            
+            $validStatuses = ['completed', 'failed', 'queued'];
+            if (!in_array($status, $validStatuses)) {
+                Router::json(['type' => 'about:blank', 'title' => 'Bad Request', 'status' => 400, 'detail' => 'Invalid status. Must be: completed, failed, or queued.'], 400);
+                return;
+            }
+
+            $stmt = $this->pdo->prepare("DELETE FROM jobs WHERE status = :status");
+            $stmt->execute(['status' => $status]);
+            $deletedCount = $stmt->rowCount();
+            
+            Router::json(['message' => "Cleaned up {$deletedCount} {$status} jobs."]);
+            
+        } catch (\Throwable $e) {
+            Router::json(['type' => 'about:blank', 'title' => 'Internal Server Error', 'status' => 500, 'detail' => 'Failed to cleanup jobs by status.'], 500);
+        }
+    }
+
 }
