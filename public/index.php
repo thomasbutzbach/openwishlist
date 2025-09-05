@@ -16,13 +16,21 @@ require __DIR__ . '/../vendor/autoload.php';
 // Load config
 $configFile = __DIR__ . '/../config/local.php';
 if (!file_exists($configFile)) {
+    // Check if installer exists
+    $installerFile = __DIR__ . '/install.php';
+    if (file_exists($installerFile)) {
+        header('Location: /install.php');
+        exit;
+    }
+    
+    // Fallback: copy example (old behavior)
     $example = __DIR__ . '/../config/local.example.php';
     if (file_exists($example)) {
         copy($example, $configFile);
         echo "Created config/local.php from example. Please adjust DB credentials and reload.";
         exit;
     }
-    die('Missing config/local.php');
+    die('Missing config/local.php and installer');
 }
 $config = require $configFile;
 
@@ -34,6 +42,48 @@ $pdo = Db::connect($config['db']);
 
 // Set PDO for global settings access in templates
 View::setPdo($pdo);
+
+// Set PDO for version access
+\OpenWishlist\Support\Version::setPdo($pdo);
+
+// Check for updates (redirect admins to update page if needed)
+$versionFile = __DIR__ . '/../VERSION';
+if (file_exists($versionFile)) {
+    $fileVersion = trim(file_get_contents($versionFile));
+    
+    // Get current app version from database
+    $stmt = $pdo->prepare("SELECT value FROM system_metadata WHERE `key` = 'app_version'");
+    $stmt->execute();
+    $dbVersion = $stmt->fetchColumn();
+    
+    if ($dbVersion && version_compare($fileVersion, $dbVersion, '>')) {
+        // Update available - redirect admins to update page
+        $updateFile = __DIR__ . '/update.php';
+        if (file_exists($updateFile) && strpos($_SERVER['REQUEST_URI'], '/admin') === 0) {
+            // Check if user is admin
+            $uid = Session::userId();
+            if ($uid) {
+                $role = $pdo->prepare('SELECT role FROM users WHERE id=:id');
+                $role->execute(['id'=>$uid]);
+                if (($role->fetchColumn() ?: 'user') === 'admin') {
+                    header('Location: /update.php?from=' . urlencode($dbVersion) . '&to=' . urlencode($fileVersion));
+                    exit;
+                }
+            }
+        }
+        
+        // For non-admin routes, store update info for admin banner
+        if ($dbVersion && $fileVersion && $dbVersion !== $fileVersion) {
+            $_SESSION['update_available'] = [
+                'from' => $dbVersion,
+                'to' => $fileVersion
+            ];
+        }
+    } else {
+        // Versions are equal, clear any session update info
+        unset($_SESSION['update_available']);
+    }
+}
 
 // Router
 $router = new Router();

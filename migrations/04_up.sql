@@ -8,10 +8,9 @@ CREATE TABLE IF NOT EXISTS system_metadata (
   PRIMARY KEY (`key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Record initial schema version
+-- Record initial schema version only
 INSERT INTO system_metadata (`key`, `value`) VALUES 
-  ('schema_version', '4'),
-  ('app_version', '0.9.0')
+  ('schema_version', '4')
 ON DUPLICATE KEY UPDATE 
   `value` = VALUES(`value`);
 
