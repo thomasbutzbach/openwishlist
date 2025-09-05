@@ -11,7 +11,68 @@ use OpenWishlist\Support\Session;
 use OpenWishlist\Support\Db;
 use OpenWishlist\Support\View;
 
-require __DIR__ . '/../vendor/autoload.php';
+// Health Check: Vendor directory and autoloader
+$vendorPath = __DIR__ . '/../vendor';
+$autoloaderPath = $vendorPath . '/autoload.php';
+
+if (!is_dir($vendorPath)) {
+    http_response_code(500);
+    die('<!DOCTYPE html><html><head><title>System Error</title></head><body>
+        <h1>🚨 System Error</h1>
+        <p><strong>Missing vendor directory</strong></p>
+        <p>The composer dependencies are not installed. Please run:</p>
+        <pre>composer install</pre>
+        <hr><small>Health Check Failed: vendor directory not found</small>
+    </body></html>');
+}
+
+if (!file_exists($autoloaderPath)) {
+    http_response_code(500);
+    die('<!DOCTYPE html><html><head><title>System Error</title></head><body>
+        <h1>🚨 System Error</h1>
+        <p><strong>Missing autoloader</strong></p>
+        <p>The composer autoloader is not available. Please run:</p>
+        <pre>composer install</pre>
+        <hr><small>Health Check Failed: autoloader not found</small>
+    </body></html>');
+}
+
+// Health Check: PHP Version
+$minPhpVersion = '8.2';
+if (version_compare(PHP_VERSION, $minPhpVersion, '<')) {
+    http_response_code(500);
+    die('<!DOCTYPE html><html><head><title>System Error</title></head><body>
+        <h1>🚨 System Error</h1>
+        <p><strong>PHP Version too old</strong></p>
+        <p>Current: ' . PHP_VERSION . ' | Required: ' . $minPhpVersion . '+</p>
+        <p>Please upgrade your PHP version.</p>
+        <hr><small>Health Check Failed: PHP version compatibility</small>
+    </body></html>');
+}
+
+// Health Check: Required PHP Extensions
+$requiredExtensions = ['pdo', 'pdo_mysql', 'json', 'mbstring', 'session'];
+$missingExtensions = [];
+
+foreach ($requiredExtensions as $ext) {
+    if (!extension_loaded($ext)) {
+        $missingExtensions[] = $ext;
+    }
+}
+
+if (!empty($missingExtensions)) {
+    http_response_code(500);
+    die('<!DOCTYPE html><html><head><title>System Error</title></head><body>
+        <h1>🚨 System Error</h1>
+        <p><strong>Missing PHP Extensions</strong></p>
+        <p>The following extensions are required but not available:</p>
+        <ul>' . implode('', array_map(fn($ext) => "<li>$ext</li>", $missingExtensions)) . '</ul>
+        <p>Please install these PHP extensions and restart your web server.</p>
+        <hr><small>Health Check Failed: PHP extensions</small>
+    </body></html>');
+}
+
+require $autoloaderPath;
 
 // Load config
 $configFile = __DIR__ . '/../config/local.php';

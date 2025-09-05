@@ -4,6 +4,25 @@ declare(strict_types=1);
 // Start session for storing installation log
 session_start();
 
+// Health Check: PHP Version
+$minPhpVersion = '8.2';
+$phpVersionCheck = version_compare(PHP_VERSION, $minPhpVersion, '>=');
+
+// Health Check: Required PHP Extensions
+$requiredExtensions = ['pdo', 'pdo_mysql', 'json', 'mbstring', 'session'];
+$extensionChecks = [];
+foreach ($requiredExtensions as $ext) {
+    $extensionChecks[$ext] = extension_loaded($ext);
+}
+
+// Health Check: File permissions
+$writableDirectories = ['config', 'public/uploads'];
+$permissionChecks = [];
+foreach ($writableDirectories as $dir) {
+    $path = __DIR__ . '/../' . $dir;
+    $permissionChecks[$dir] = is_dir($path) && is_writable($path);
+}
+
 $configFile = __DIR__ . '/../config/local.php';
 if (file_exists($configFile)) {
     header('Location: /');
@@ -315,6 +334,32 @@ if ($success && !$showInstallationLog) {
         .log-entry:last-child {
             margin-bottom: 0;
         }
+        
+        .requirements-check {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .requirements-check h3 {
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .requirement-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 14px;
+            gap: 8px;
+        }
+        
+        .requirement-item:last-child {
+            margin-bottom: 0;
+        }
     </style>
 </head>
 <body>
@@ -359,6 +404,43 @@ if ($success && !$showInstallationLog) {
             ?>
         <?php endif; ?>
         
+        <!-- System Requirements Check -->
+        <div class="requirements-check">
+            <h3>System Requirements</h3>
+            
+            <div class="requirement-item">
+                <?= $phpVersionCheck ? '✅' : '❌' ?> 
+                <strong>PHP Version: </strong><?= PHP_VERSION ?> 
+                <?= $phpVersionCheck ? '(OK)' : "(Requires {$minPhpVersion}+)" ?>
+            </div>
+            
+            <?php foreach ($extensionChecks as $ext => $available): ?>
+                <div class="requirement-item">
+                    <?= $available ? '✅' : '❌' ?> 
+                    <strong>Extension <?= $ext ?>: </strong><?= $available ? 'Available' : 'Missing' ?>
+                </div>
+            <?php endforeach; ?>
+            
+            <?php foreach ($permissionChecks as $dir => $writable): ?>
+                <div class="requirement-item">
+                    <?= $writable ? '✅' : '❌' ?> 
+                    <strong>Directory <?= $dir ?>: </strong><?= $writable ? 'Writable' : 'Not writable' ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+        
+        <?php 
+        $allRequirementsMet = $phpVersionCheck && 
+                            !in_array(false, $extensionChecks, true) && 
+                            !in_array(false, $permissionChecks, true);
+        ?>
+        
+        <?php if (!$allRequirementsMet): ?>
+            <div class="errors">
+                <div class="error-item">❌ System requirements not met. Please fix the issues above before continuing.</div>
+            </div>
+        <?php endif; ?>
+        
         <?php if (!$showInstallationLog): ?>
         <form method="POST">
             <div class="form-group">
@@ -401,7 +483,9 @@ if ($success && !$showInstallationLog) {
                 <input type="password" id="db_pass" name="db_pass" value="<?= htmlspecialchars($_POST['db_pass'] ?? '') ?>">
             </div>
             
-            <button type="submit">🚀 Start Installation</button>
+            <button type="submit" <?= !$allRequirementsMet ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '' ?>>
+                🚀 Start Installation
+            </button>
         </form>
         <?php endif; ?>
     </div>
