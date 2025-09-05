@@ -10,6 +10,18 @@ use OpenWishlist\Support\Version;
     </ul>
 </nav>
 
+
+<?php if (isset($_GET['updated']) && $_GET['updated'] === '1'): ?>
+    <article>
+        <header>
+            <strong>✅ Update Completed</strong>
+        </header>
+        <p>
+            Your OpenWishlist installation has been successfully updated!
+        </p>
+    </article>
+<?php endif; ?>
+
 <hgroup>
     <h1>Admin Dashboard <small style="color: #666; font-weight: normal;"><?= Version::formatDisplay() ?></small></h1>
     <p>System overview and statistics</p>
