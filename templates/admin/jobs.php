@@ -114,7 +114,8 @@
 
 <script>
 async function deleteJob(jobId) {
-    if (!confirm('Are you sure you want to delete this job?')) {
+    const confirmed = await showConfirm('Are you sure you want to delete this job?');
+    if (!confirmed) {
         return;
     }
     
@@ -150,7 +151,8 @@ async function cleanupJobsByStatus(status) {
         return;
     }
     
-    if (!confirm(`This will delete ALL ${counts[status]} ${status} jobs. Continue?`)) {
+    const confirmed = await showConfirm(`This will delete ALL ${counts[status]} ${status} jobs. Continue?`);
+    if (!confirmed) {
         return;
     }
     
@@ -178,7 +180,8 @@ async function cleanupJobsByStatus(status) {
 }
 
 async function cleanupOldJobs() {
-    if (!confirm('This will delete completed jobs older than 7 days and failed jobs older than 30 days. Continue?')) {
+    const confirmed = await showConfirm('This will delete completed jobs older than 7 days and failed jobs older than 30 days. Continue?');
+    if (!confirmed) {
         return;
     }
     

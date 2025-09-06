@@ -50,7 +50,7 @@
   </div>
 </form>
 
-<form action="/wishes/<?= (int)$wish['id'] ?>/delete" method="post" style="margin-top:1rem" onsubmit="return confirm('Delete this wish?');">
+<form action="/wishes/<?= (int)$wish['id'] ?>/delete" method="post" style="margin-top:1rem">
   <?= \OpenWishlist\Support\Csrf::field() ?>
-  <button type="submit">Delete wish</button>
+  <button type="submit" data-confirm="Delete this wish?">Delete wish</button>
 </form>

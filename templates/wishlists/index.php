@@ -43,9 +43,9 @@
       <footer>
         <a href="/wishlists/<?= (int)$l['id'] ?>" role="button">Open</a>
         <a href="/wishlists/<?= (int)$l['id'] ?>/edit" role="button" class="secondary">Edit</a>
-        <form style="display: inline-block;" action="/wishlists/<?= (int)$l['id'] ?>/delete" method="post" onsubmit="return confirm('Delete this wishlist and all its wishes?');">
+        <form style="display: inline-block;" action="/wishlists/<?= (int)$l['id'] ?>/delete" method="post">
           <?= \OpenWishlist\Support\Csrf::field() ?>
-          <input type="submit" value="Delete" class="outline">
+          <input type="submit" value="Delete" class="outline" data-confirm="Delete this wishlist and all its wishes?">
         </form>
       </footer>
     </article>
