@@ -94,9 +94,9 @@
         <!-- Actions -->
         <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 50px; justify-content: center; align-self: center;">
           <a href="/wishes/<?= (int)$w['id'] ?>/edit" style="padding: 0.2rem 0.3rem; font-size: 0.7em; text-align: center; color: var(--secondary); text-decoration: none; background: transparent; line-height: 1;">✏️ Edit</a>
-          <form style="margin: 0;" action="/wishes/<?= (int)$w['id'] ?>/delete" method="post" onsubmit="return confirm('Delete this wish?');">
+          <form style="margin: 0;" action="/wishes/<?= (int)$w['id'] ?>/delete" method="post">
             <?= \OpenWishlist\Support\Csrf::field() ?>
-            <input type="submit" value="🗑️ Delete" style="width: 100%; padding: 0.2rem 0.3rem; font-size: 0.7em; background-color: transparent; color: var(--secondary); border: none; cursor: pointer; line-height: 1;">
+            <input type="submit" value="🗑️ Delete" data-confirm="Delete this wish?" style="width: 100%; padding: 0.2rem 0.3rem; font-size: 0.7em; background-color: transparent; color: var(--secondary); border: none; cursor: pointer; line-height: 1;">
           </form>
         </div>
       </div>

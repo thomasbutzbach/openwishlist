@@ -81,10 +81,9 @@ use OpenWishlist\Support\Version;
         
         <?php if ($linkCount > 0): ?>
             <footer>
-                <form method="POST" action="/admin/convert-links-to-local" style="display: inline;" 
-                      onsubmit="return confirm('Convert all <?= $linkCount ?> linked images to local storage? This will queue background jobs to download the images.')">
+                <form method="POST" action="/admin/convert-links-to-local" style="display: inline;">
                     <?= \OpenWishlist\Support\Csrf::field() ?>
-                    <button type="submit" class="secondary">Convert <?= $linkCount ?> Links to Local</button>
+                    <button type="submit" class="secondary" data-confirm="Convert all <?= $linkCount ?> linked images to local storage? This will queue background jobs to download the images.">Convert <?= $linkCount ?> Links to Local</button>
                 </form>
             </footer>
         <?php endif; ?>

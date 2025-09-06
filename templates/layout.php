@@ -51,6 +51,20 @@
     </p>
     </main>
 
+    <!-- Confirm Modal -->
+    <dialog id="confirmModal">
+      <article style="max-width: 400px; margin: 0;">
+        <header>
+          <h4 id="confirmTitle">Confirm Action</h4>
+        </header>
+        <p id="confirmMessage">Are you sure?</p>
+        <footer>
+          <button id="confirmCancel" class="secondary">Cancel</button>
+          <button id="confirmOk" class="primary">Confirm</button>
+        </footer>
+      </article>
+    </dialog>
+
     <script>
     // Show/hide image URL field based on image mode selection
     document.addEventListener('DOMContentLoaded', function() {
@@ -96,6 +110,67 @@
           });
         }
       }
+      
+      // Confirm Modal System
+      const confirmModal = document.getElementById('confirmModal');
+      const confirmTitle = document.getElementById('confirmTitle');
+      const confirmMessage = document.getElementById('confirmMessage');
+      const confirmOk = document.getElementById('confirmOk');
+      const confirmCancel = document.getElementById('confirmCancel');
+      
+      // Global confirm function
+      window.showConfirm = function(message, title = 'Confirm Action') {
+        return new Promise((resolve) => {
+          confirmTitle.textContent = title;
+          confirmMessage.textContent = message;
+          confirmModal.showModal();
+          
+          const handleOk = () => {
+            confirmModal.close();
+            cleanup();
+            resolve(true);
+          };
+          
+          const handleCancel = () => {
+            confirmModal.close();
+            cleanup();
+            resolve(false);
+          };
+          
+          const cleanup = () => {
+            confirmOk.removeEventListener('click', handleOk);
+            confirmCancel.removeEventListener('click', handleCancel);
+            confirmModal.removeEventListener('click', handleDialogClick);
+          };
+          
+          const handleDialogClick = (e) => {
+            if (e.target === confirmModal) {
+              handleCancel();
+            }
+          };
+          
+          confirmOk.addEventListener('click', handleOk);
+          confirmCancel.addEventListener('click', handleCancel);
+          confirmModal.addEventListener('click', handleDialogClick);
+        });
+      };
+      
+      // Replace all confirm() calls with custom modal
+      document.addEventListener('click', async function(e) {
+        if (e.target.hasAttribute('data-confirm')) {
+          e.preventDefault();
+          const message = e.target.getAttribute('data-confirm');
+          const confirmed = await showConfirm(message);
+          
+          if (confirmed) {
+            if (e.target.tagName === 'A') {
+              window.location.href = e.target.href;
+            } else if (e.target.form) {
+              e.target.form.submit();
+            }
+          }
+        }
+      });
     });
     </script>
 </body>
