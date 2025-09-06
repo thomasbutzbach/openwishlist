@@ -89,9 +89,85 @@ abstract class ApiTestBase
         ];
     }
 
-    protected function get(string $path, array $headers = []): array
+    protected function get(string $path, array $headers = [], bool $followRedirects = true): array
     {
+        if (!$followRedirects) {
+            $result = $this->makeRequestWithOptions('GET', $path, null, $headers, ['followRedirects' => false]);
+            return $result;
+        }
         return $this->makeRequest('GET', $path, null, $headers);
+    }
+
+    // Helper method for requests with options
+    protected function makeRequestWithOptions(string $method, string $path, ?array $data = null, array $headers = [], array $options = []): array
+    {
+        $url = $this->baseUrl . $path;
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => $options['followRedirects'] ?? true,
+            CURLOPT_HEADER => true,
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_TIMEOUT => 10
+        ]);
+
+        // Add session cookie if available
+        if ($this->sessionCookie) {
+            curl_setopt($ch, CURLOPT_COOKIE, $this->sessionCookie);
+        }
+
+        // Add CSRF token if available and needed
+        if ($this->csrfToken && in_array($method, ['POST', 'PUT', 'DELETE', 'PATCH'])) {
+            $headers['X-CSRF-Token'] = $this->csrfToken;
+        }
+
+        // Add JSON data for API calls
+        if ($data !== null) {
+            $headers['Content-Type'] = 'application/json';
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        }
+
+        // Set headers
+        if (!empty($headers)) {
+            $headerList = [];
+            foreach ($headers as $key => $value) {
+                if (is_int($key)) {
+                    $headerList[] = $value; // Allow raw header strings
+                } else {
+                    $headerList[] = "$key: $value";
+                }
+            }
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headerList);
+        }
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        
+        if ($response === false) {
+            throw new Exception('CURL error: ' . curl_error($ch));
+        }
+
+        curl_close($ch);
+
+        $headers = substr($response, 0, $headerSize);
+        $body = substr($response, $headerSize);
+
+        // Parse headers into array
+        $headerLines = array_filter(explode("\r\n", $headers));
+        
+        // Try to parse JSON response
+        $jsonData = json_decode($body, true);
+        
+        return [
+            'status' => $httpCode,
+            'headers' => $headerLines,
+            'body' => $body,
+            'json' => $jsonData,
+            'raw' => $response
+        ];
     }
 
     protected function post(string $path, ?array $data = null, array $headers = []): array
@@ -99,8 +175,11 @@ abstract class ApiTestBase
         return $this->makeRequest('POST', $path, $data, $headers);
     }
 
-    protected function put(string $path, ?array $data = null, array $headers = []): array
+    protected function put(string $path, ?array $data = null, array $headers = [], bool $followRedirects = true): array
     {
+        if (!$followRedirects) {
+            return $this->makeRequestWithOptions('PUT', $path, $data, $headers, ['followRedirects' => false]);
+        }
         return $this->makeRequest('PUT', $path, $data, $headers);
     }
 
@@ -255,10 +334,10 @@ abstract class ApiTestBase
         // This method can be called at the end of test suites
         
         if (!$this->sessionCookie) {
-            // Try to login with any test user to get admin access
-            foreach ($this->testUserIds as $userId) {
-                // We can't login with user ID, so skip this approach
-                break;
+            // Try to login with any test user to get access for cleanup
+            if (!empty($this->testUserIds)) {
+                // We can't easily login with user ID in this context, so skip cleanup auth
+                // Manual cleanup would be needed via test:cleanup command
             }
         }
         
