@@ -85,7 +85,7 @@ function main(array $argv): void
                 $pdo->beginTransaction();
                 
                 try {
-                    // Delete jobs first
+                    // Delete jobs FIRST (before wishes are deleted)
                     if ($jobCount > 0) {
                         $deleteJobs = "DELETE FROM jobs WHERE type = 'image.fetch' 
                                       AND JSON_EXTRACT(payload, '$.wishId') IN (
@@ -118,6 +118,17 @@ function main(array $argv): void
                     $deleted = $pdo->exec($deleteUsers);
                     echo "✅ Deleted $deleted test users\n";
                     
+                    // Clean up any remaining orphaned jobs (jobs referencing non-existent wishes)
+                    $orphanedJobsQuery = "DELETE FROM jobs 
+                                         WHERE type = 'image.fetch' 
+                                         AND JSON_EXTRACT(payload, '$.wishId') NOT IN (
+                                             SELECT id FROM wishes
+                                         )";
+                    $orphanedDeleted = $pdo->exec($orphanedJobsQuery);
+                    if ($orphanedDeleted > 0) {
+                        echo "✅ Deleted $orphanedDeleted orphaned jobs\n";
+                    }
+                    
                     $pdo->commit();
                     echo "\n🎉 Cleanup completed successfully!\n";
                     
@@ -130,7 +141,38 @@ function main(array $argv): void
                 echo "Run without --dry-run to perform actual cleanup.\n";
             }
         } else {
-            echo "No test data found to cleanup.\n";
+            // Even if no test users found, check for orphaned jobs
+            echo "Scanning for orphaned jobs...\n";
+            $orphanedJobsQuery = "SELECT COUNT(*) FROM jobs 
+                                 WHERE type = 'image.fetch' 
+                                 AND JSON_EXTRACT(payload, '$.wishId') NOT IN (
+                                     SELECT id FROM wishes
+                                 )";
+            $orphanedJobCount = $pdo->query($orphanedJobsQuery)->fetchColumn();
+            echo "Found $orphanedJobCount orphaned jobs\n";
+            
+            if ($orphanedJobCount > 0) {
+                echo "\nOrphaned jobs to cleanup:\n";
+                echo "- Jobs: $orphanedJobCount\n\n";
+                
+                if (!$dryRun) {
+                    echo "Cleaning up orphaned jobs...\n";
+                    
+                    $deleteOrphanedJobs = "DELETE FROM jobs 
+                                          WHERE type = 'image.fetch' 
+                                          AND JSON_EXTRACT(payload, '$.wishId') NOT IN (
+                                              SELECT id FROM wishes
+                                          )";
+                    $deleted = $pdo->exec($deleteOrphanedJobs);
+                    echo "✅ Deleted $deleted orphaned jobs\n";
+                    echo "\n🎉 Cleanup completed successfully!\n";
+                } else {
+                    echo "DRY RUN - No data was actually deleted.\n";
+                    echo "Run without --dry-run to perform actual cleanup.\n";
+                }
+            } else {
+                echo "No test data or orphaned jobs found to cleanup.\n";
+            }
         }
         
     } catch (Exception $e) {
