@@ -12,8 +12,9 @@ final class PublicApiTest extends ApiTestBase
         $this->testEmail = 'publictest' . time() . '@example.com';
     }
 
-    public function testHealthCheck(): void
+    public function testHealthEndpoint(): void
     {
+        // Test the simple /health endpoint (different from /health.php)
         $response = $this->get('/health');
         
         $json = $this->assertJsonResponse($response, 200);

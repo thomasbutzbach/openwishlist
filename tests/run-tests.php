@@ -18,6 +18,9 @@ require_once __DIR__ . '/AuthApiTest.php';
 require_once __DIR__ . '/WishlistApiTest.php';
 require_once __DIR__ . '/WishApiTest.php';
 require_once __DIR__ . '/PublicApiTest.php';
+require_once __DIR__ . '/HealthAdminTest.php';
+require_once __DIR__ . '/ExportTest.php';
+require_once __DIR__ . '/JobSystemTest.php';
 
 function getTestMethods(object $testInstance): array
 {
@@ -59,8 +62,8 @@ function main(): void
     
     echo "🚀 Starting OpenWishlist API Test Suite\n";
     
-    // Check if server is running
-    $healthCheck = @file_get_contents('http://127.0.0.1:8080/health');
+    // Check if server is running (use simple endpoint that doesn't require auth)
+    $healthCheck = @file_get_contents('http://127.0.0.1:8080/');
     if ($healthCheck === false) {
         echo "❌ ERROR: OpenWishlist server is not running on http://127.0.0.1:8080\n";
         echo "Please start the server with: composer start\n";
@@ -74,7 +77,10 @@ function main(): void
         'AuthApiTest' => AuthApiTest::class,
         'WishlistApiTest' => WishlistApiTest::class, 
         'WishApiTest' => WishApiTest::class,
-        'PublicApiTest' => PublicApiTest::class
+        'PublicApiTest' => PublicApiTest::class,
+        'HealthAdminTest' => HealthAdminTest::class,
+        'ExportTest' => ExportTest::class,
+        'JobSystemTest' => JobSystemTest::class
     ];
     
     if ($targetTest) {
