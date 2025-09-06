@@ -17,12 +17,8 @@
       <div><small>Share: <a href="/s/<?= htmlspecialchars($wl['share_slug']) ?>">/s/<?= htmlspecialchars($wl['share_slug']) ?></a></small></div>
     <?php endif; ?>
   </div>
-  <div class="row">
+  <div class="row" style="display: flex; gap: 0.5rem; align-items: center;">
     <button type="submit">Save</button>
+    <button type="button" class="secondary" style="white-space: nowrap;" onclick="window.location.href='/wishlists/<?= (int)$wl['id'] ?>'">Back to List</button>
   </div>
-</form>
-
-<form action="/wishlists/<?= (int)$wl['id'] ?>/toggle-public" method="post" style="margin-top:1rem">
-  <?= \OpenWishlist\Support\Csrf::field() ?>
-  <button type="submit"><?= $wl['is_public'] ? 'Make private' : 'Make public' ?></button>
 </form>

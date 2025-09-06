@@ -4,9 +4,9 @@
 </hgroup>
 
 <form method="GET" style="margin-bottom: 1rem;">
-  <div class="grid">
-    <input type="search" name="search" placeholder="Search wishlists..." value="<?= htmlspecialchars($search ?? '') ?>">
-    <button type="submit">Search</button>
+  <div style="display: flex; gap: 0.5rem; align-items: stretch;">
+    <input type="search" name="search" placeholder="Search wishlists..." value="<?= htmlspecialchars($search ?? '') ?>" style="flex-grow: 1; min-width: 200px;">
+    <input type="submit" value="Search" style="flex-grow: 0; width: 80px; padding: 0.5rem; font-size: 0.85em;">
   </div>
   <?php if (!empty($search)): ?>
     <small><a href="/wishlists">Clear search</a></small>
@@ -25,29 +25,43 @@
   </article>
 <?php else: ?>
   <?php foreach ($lists as $l): ?>
-    <article>
-      <header>
-        <h3><a href="/wishlists/<?= (int)$l['id'] ?>"><?= htmlspecialchars($l['title']) ?></a></h3>
-        <?php if (!empty($l['description'])): ?>
-          <p><?= htmlspecialchars($l['description']) ?></p>
-        <?php endif; ?>
-      </header>
-      
-      <p>
-        <mark><?= $l['is_public'] ? '🌐 Public' : '🔒 Private' ?></mark>
-        <?php if (!empty($l['is_public']) && !empty($l['share_slug'])): ?>
-          <br><small>Share: <a href="/s/<?= htmlspecialchars($l['share_slug']) ?>">/s/<?= htmlspecialchars($l['share_slug']) ?></a></small>
-        <?php endif; ?>
-      </p>
-      
-      <footer>
-        <a href="/wishlists/<?= (int)$l['id'] ?>" role="button">Open</a>
-        <a href="/wishlists/<?= (int)$l['id'] ?>/edit" role="button" class="secondary">Edit</a>
-        <form style="display: inline-block;" action="/wishlists/<?= (int)$l['id'] ?>/delete" method="post">
-          <?= \OpenWishlist\Support\Csrf::field() ?>
-          <input type="submit" value="Delete" class="outline" data-confirm="Delete this wishlist and all its wishes?">
-        </form>
-      </footer>
+    <article style="margin-bottom: 0.4rem; padding: 0.4rem 0.75rem; font-size: 0.9em;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <!-- Main Content -->
+        <div style="flex: 1;">
+          <div style="margin-bottom: 0.2rem;">
+            <strong style="font-size: 1.1em;">
+              <a href="/wishlists/<?= (int)$l['id'] ?>" style="text-decoration: none; color: inherit;">
+                <?= htmlspecialchars($l['title']) ?>
+              </a>
+            </strong>
+            <span style="margin-left: 0.5rem; font-size: 0.8em;">
+              <?= $l['is_public'] ? '🌐 Public' : '🔒 Private' ?>
+            </span>
+          </div>
+          
+          <?php if (!empty($l['description'])): ?>
+            <div style="font-size: 0.85em; color: var(--muted-color); line-height: 1.3; margin-bottom: 0.2rem;">
+              <?= htmlspecialchars(strlen($l['description']) > 120 ? substr($l['description'], 0, 120) . '...' : $l['description']) ?>
+            </div>
+          <?php endif; ?>
+          
+          <?php if (!empty($l['is_public']) && !empty($l['share_slug'])): ?>
+            <div style="font-size: 0.75em; color: var(--muted-color);">
+              Share: <a href="/s/<?= htmlspecialchars($l['share_slug']) ?>" style="color: var(--primary); text-decoration: none;">/s/<?= htmlspecialchars($l['share_slug']) ?></a>
+            </div>
+          <?php endif; ?>
+        </div>
+        
+        <!-- Actions -->
+        <div style="display: flex; flex-direction: column; gap: 0.25rem; min-width: 50px;">
+          <a href="/wishlists/<?= (int)$l['id'] ?>/edit" style="padding: 0.2rem 0.3rem; font-size: 0.7em; text-align: center; color: var(--secondary); text-decoration: none; background: transparent; line-height: 1;">✏️ Edit</a>
+          <form style="margin: 0;" action="/wishlists/<?= (int)$l['id'] ?>/delete" method="post">
+            <?= \OpenWishlist\Support\Csrf::field() ?>
+            <input type="submit" value="🗑️ Delete" data-confirm="Delete this wishlist and all its wishes?" style="width: 100%; padding: 0.2rem 0.3rem; font-size: 0.7em; background-color: transparent; color: var(--secondary); border: none; cursor: pointer; line-height: 1;">
+          </form>
+        </div>
+      </div>
     </article>
   <?php endforeach; ?>
   
